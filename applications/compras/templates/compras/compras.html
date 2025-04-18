@@ -1,0 +1,74 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Compras - StockPro</title>
+  <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
+<body>
+  <div class="container">
+    <aside class="sidebar">
+      <a href="{% url 'home' %}" class="logo">
+          <span class="icon">📈</span>
+          <span class="text">StockPro</span>
+      </a>
+        
+      <p class="user">
+          <span class="icon">👤</span>
+          <span class="text">Valentín Marta</span>
+      </p>
+    
+      <nav>
+        <a href="{% url 'compras' %}" class="menu-item">
+          <span class="icon">🛒</span>
+          <span class="text">Compras</span>
+        </a>
+        <a href="{% url 'ventas' %}" class="menu-item">
+          <span class="icon">💼</span>
+          <span class="text">Ventas</span>
+        </a>
+        <a href="{% url 'analisis' %}" class="menu-item">
+          <span class="icon">📊</span>
+          <span class="text">Análisis Financiero</span>
+        </a>
+        <a href="{% url 'historial_compras' %}" class="menu-item">
+          <span class="icon">🕒</span>
+          <span class="text">Historial</span>
+        </a>
+        <a href="{% url 'stock' %}" class="menu-item">
+          <span class="icon">📦</span>
+          <span class="text">Stock de Productos</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+          <a href="#" class="menu-item">
+            <span class="icon">⚙️</span>
+            <span class="text">Configuración</span>
+          </a>
+          <a href="#" class="menu-item">
+            <span class="icon">🔒</span>
+            <span class="text">Cerrar sesión</span>
+          </a>
+      </div>
+    </aside>
+      
+    <main class="dashboard">
+      <h1>Registro de Compras</h1>
+      <form id="form-compra" class="formulario">
+        <input type="text" id="id" placeholder="ID del producto" required>
+        <input type="text" id="nombre" placeholder="Nombre del producto" required>
+        <input type="number" id="cantidad" placeholder="Cantidad de unidades" required>
+        <input type="text" id="unidad" placeholder="Tipo de unidad (kg, lt, u)" required>
+        <input type="date" id="vencimiento" required>
+        <input type="number" id="precioCompra" placeholder="Precio de compra" required>
+        <input type="number" id="precioVenta" placeholder="Precio de venta" required>
+        <button type="submit">Agregar producto</button>
+      </form>
+    </main>
+    
+    <script src="{% static 'script.js' %}"></script>
+    
+  </div>
+</body>
+</html>

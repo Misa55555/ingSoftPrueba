@@ -1,0 +1,255 @@
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #0e2a36;
+    color: #fff;
+    height: 100vh;
+    overflow: hidden; /* evitar scroll innecesario */
+}
+  
+
+.container {
+    display: flex;
+    width: 100%;
+    height: 100vh; /* que ocupe toda la altura visible de la ventana */
+    overflow: hidden;
+  }
+  
+
+  .sidebar {
+    width: 70px;
+    background: #09202a;
+    transition: width 0.3s ease;
+    overflow: hidden;
+    position: relative;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px 10px;
+    box-sizing: border-box;
+    padding-bottom: 40px;
+  }
+  
+  .sidebar:hover {
+    width: 240px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 22px;
+    text-decoration: none;
+    color: #fff;
+    margin-bottom: 20px;
+    transition: transform 0.3s ease;
+    overflow: hidden;
+  
+  }
+  
+  .logo .text {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    white-space: nowrap;
+  }
+  
+  .sidebar:hover .logo .text {
+    opacity: 1;
+    width: auto;
+  }
+  
+  
+  .logo:hover {
+    transform: scale(1.05);
+  }
+  
+
+  .user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 30px;
+    font-weight: bold;
+    overflow: hidden;
+  }
+  
+  .user .text {
+    opacity: 0;
+    white-space: nowrap;
+    transition: opacity 0.3s ease;
+  }
+  
+  .sidebar:hover .user .text {
+    opacity: 1;
+  }
+  
+
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #c0e0f0;
+    text-decoration: none;
+    padding: 10px;
+    border-radius: 8px;
+    transition: background 0.3s ease, transform 0.3s ease;
+  }
+  
+  .menu-item:hover {
+    background-color: #126e82;
+    transform: translateX(5px);
+  }
+  
+  .icon {
+    font-size: 20px;
+    text-align: center;
+    min-width: 30px;
+  }
+  
+  .text {
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+
+  .sidebar:hover .text {
+    opacity: 1;
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding-top: 20px;
+    border-top: 1px solid #1c3a46;
+  }
+  
+  .sidebar-footer .menu-item {
+    font-size: 13px;
+    opacity: 0.8;
+  }
+
+  .sidebar-footer .text {
+    font-size: 13px;
+  }
+
+.dashboard {
+    flex: 1;
+    padding: 40px;
+    background: linear-gradient(135deg, #073544, #0f5c6e);
+    overflow-y: auto; /* scroll si hace falta, no se desborda */
+    height: 100vh; /* ocupar toda la altura disponible */
+    box-sizing: border-box;
+  }
+  
+
+h1 {
+  margin-bottom: 30px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  padding: 20px;
+  border-radius: 12px;
+  font-weight: bold;
+  font-size: 18px;
+  color: #fff;
+}
+
+.card:hover {
+    transform: scale(1.05);
+  }
+
+.card span {
+  display: block;
+  font-size: 24px;
+  margin-top: 10px;
+}
+
+.card.dark {
+  background-color: #0f3d4c;
+}
+
+.card.teal {
+  background-color: #15aabf;
+}
+
+.card.light {
+  background-color: #d0ecef;
+  color: #0e2a36;
+}
+
+.card.chart {
+  height: 100px;
+  background-color: #0a3c4a;
+}
+
+form.formulario {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  max-width: 600px;
+  margin-bottom: 30px;
+}
+
+form.formulario input,
+form.formulario button {
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+form.formulario button {
+  grid-column: span 2;
+  background-color: #126e82;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+form.formulario button:hover {
+  background-color: #1796b0;
+}
+
+/* Tabla */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+  background-color: #093341;
+  color: #fff;
+}
+
+table thead {
+  background-color: #0a4b5a;
+}
+
+table th, table td {
+  padding: 14px 20px;
+  text-align: left;
+  border-bottom: 1px solid #145c6e;
+}
+
+table th {
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
