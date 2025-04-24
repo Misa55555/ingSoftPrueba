@@ -63,7 +63,19 @@
             <th>Vencimiento</th><th>Precio Compra</th><th>Precio Venta</th>
           </tr>
         </thead>
-        <tbody id="tabla-stock"></tbody>
+        <tbody>
+          {% for producto in productos %}
+            <tr>
+              <td>{{ producto.nombre }}</td>
+              <td>{{ producto.id }}</td>
+              <td>{{ producto.cantidad }}</td>
+              <td>{{ producto.unidad }}</td>
+              <td>{{ producto.vencimiento }}</td>
+              <td>{{ producto.precio_compra }}</td>
+              <td>{{ producto.precio_venta }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>        
       </table>
     </main>
     <script src="{% static 'script.js' %}"></script>

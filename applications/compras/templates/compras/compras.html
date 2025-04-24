@@ -55,16 +55,12 @@
       
     <main class="dashboard">
       <h1>Registro de Compras</h1>
-      <form id="form-compra" class="formulario">
-        <input type="text" id="id" placeholder="ID del producto" required>
-        <input type="text" id="nombre" placeholder="Nombre del producto" required>
-        <input type="number" id="cantidad" placeholder="Cantidad de unidades" required>
-        <input type="text" id="unidad" placeholder="Tipo de unidad (kg, lt, u)" required>
-        <input type="date" id="vencimiento" required>
-        <input type="number" id="precioCompra" placeholder="Precio de compra" required>
-        <input type="number" id="precioVenta" placeholder="Precio de venta" required>
+      <form method="POST" class="formulario">
+        {% csrf_token %}
+        {{ form.as_p }}
         <button type="submit">Agregar producto</button>
       </form>
+      
     </main>
     
     <script src="{% static 'script.js' %}"></script>
