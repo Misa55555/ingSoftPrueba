@@ -1,0 +1,166 @@
+{% extends 'base.html' %} {# Asume que tienes una plantilla base 'base.html' #}
+{% load static %} {# Para cargar archivos estáticos si los usas #}
+{% load humanize %} {# Para formatos como intcomma (opcional, requiere añadir 'django.contrib.humanize' a INSTALLED_APPS) #}
+
+{% block title %}Registro de Ventas{% endblock %}
+
+{% block content %}
+<style>
+    /* Estilos básicos para la demo - Ajusta según tu CSS framework o diseño */
+    .pos-container { display: flex; gap: 20px; }
+    .product-section { flex: 3; /* Ocupa más espacio */ }
+    .cart-section { flex: 1; border: 1px solid #ccc; padding: 15px; border-radius: 5px; background-color: #f9f9f9; }
+    .search-filter-section { margin-bottom: 20px; padding: 15px; background-color: #eee; border-radius: 5px; }
+    .search-filter-section form { display: flex; gap: 10px; align-items: center; }
+    .search-filter-section input[type="search"] { flex-grow: 1; padding: 8px; }
+    .search-filter-section button { padding: 8px 12px; }
+    .category-filters { margin-top: 10px; }
+    .category-filters .btn { margin-right: 5px; padding: 5px 10px; text-decoration: none; border: 1px solid #ccc; background-color: white; color: #333; border-radius: 3px;}
+    .category-filters .btn.active { background-color: #007bff; color: white; border-color: #007bff;}
+
+    .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
+    .product-card { border: 1px solid #ddd; padding: 10px; border-radius: 4px; text-align: center; background-color: white; }
+    .product-card img { max-width: 100px; height: auto; margin-bottom: 10px; background-color: #eee; /* Placeholder visual */}
+    .product-card h5 { margin: 5px 0; font-size: 1em; }
+    .product-card p { margin: 3px 0; font-size: 0.9em; color: #555; }
+    .product-card .price { font-weight: bold; color: #28a745; margin-bottom: 10px; font-size: 1.1em; }
+    .product-card button, .product-card a.btn {
+        padding: 8px 12px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 0.9em; width: 90%;
+    }
+     .product-card button:hover, .product-card a.btn:hover { background-color: #c82333; }
+
+    .cart-item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #ccc; padding: 10px 0; }
+    .cart-item:last-child { border-bottom: none; }
+    .cart-item-info { flex-grow: 1; margin-right: 10px;}
+    .cart-item-info span { display: block; font-size: 0.9em; }
+    .cart-item-info .name { font-weight: bold; font-size: 1em;}
+    .cart-item-actions { display: flex; align-items: center; gap: 5px; }
+    .cart-item-actions form { display: inline-block; margin: 0;}
+    .cart-item-actions input[type="number"] { width: 50px; text-align: center; padding: 4px;}
+    .cart-item-actions button { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 1.2em; padding: 0 5px;}
+    .cart-item-actions .update-btn { color: #007bff; font-size: 0.8em; padding: 3px 6px; border: 1px solid; border-radius: 3px;}
+
+
+    .cart-summary { margin-top: 20px; border-top: 1px solid #aaa; padding-top: 15px; }
+    .cart-summary p { display: flex; justify-content: space-between; margin: 5px 0; font-size: 1.1em; }
+    .cart-summary .total { font-weight: bold; font-size: 1.3em; }
+    .cart-actions { margin-top: 15px; display: flex; justify-content: space-between; }
+    .cart-actions form, .cart-actions a { margin: 0; } /* Reset margin for buttons in forms */
+    .btn-checkout { width: 100%; padding: 12px; background-color: #28a745; color: white; font-size: 1.2em; text-align: center; text-decoration: none; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+    .btn-checkout:hover { background-color: #218838; }
+    .btn-clear-cart { padding: 8px 12px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; }
+    .btn-clear-cart:hover { background-color: #e0a800; }
+
+    /* Mensajes de Django */
+    .messages { list-style: none; padding: 0; margin-bottom: 15px; }
+    .messages li { padding: 10px 15px; margin-bottom: 10px; border-radius: 4px; }
+    .messages li.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .messages li.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    .messages li.warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+    .messages li.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+</style>
+
+<div class="container mt-4">
+    <h2><i class="fas fa-cash-register"></i> Registro de Ventas</h2>
+    <hr>
+
+    {# Mostrar mensajes de Django #}
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <div class="pos-container">
+
+        <div class="product-section">
+            <div class="search-filter-section">
+                <form method="get" action="{% url 'sales:pos_view' %}">
+                    <input type="search" name="q" placeholder="Buscar productos por nombre, código..." value="{{ search_query|default:'' }}" class="form-control">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Buscar</button>
+                </form>
+                <div class="category-filters mt-2">
+                    <a href="{% url 'sales:pos_view' %}{% if search_query %}?q={{ search_query }}{% endif %}" class="btn {% if not selected_category %}active{% endif %}">Todos</a>
+                    {% for category in categories %}
+                    <a href="{% url 'sales:pos_view' %}?category={{ category.id }}{% if search_query %}&q={{ search_query }}{% endif %}"
+                       class="btn {% if selected_category == category.id %}active{% endif %}">
+                       {{ category.name }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <h4>Productos Disponibles</h4>
+            <div class="product-grid">
+                {% for product in products %}
+                <div class="product-card">
+                    {# <img src="{% static 'images/placeholder.png' %}" alt="{{ product.name }}"> #} {# Placeholder Imagen #}
+                    <div style="width:100px; height:100px; background:#eee; margin: 0 auto 10px auto; display:flex; align-items:center; justify-content:center; color:#aaa;">IMG</div>
+                    <h5>{{ product.name }}</h5>
+                    <p>{{ product.brand.name }} / {{ product.category.name }}</p>
+                    <p>Stock: {{ product.stock }}</p>
+                    <p class="price">${{ product.price|floatformat:2 }}</p>
+                    {# Botón Añadir - usa un enlace estilizado como botón para GET simple #}
+                     <a href="{% url 'sales:add_to_cart' product.id %}?q={{ search_query|default:'' }}&category={{ selected_category|default:'' }}" class="btn btn-danger">
+                        <i class="fas fa-cart-plus"></i> Agregar
+                    </a>
+                </div>
+                {% empty %}
+                <p>No se encontraron productos con los filtros seleccionados.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="cart-section">
+            <h4><i class="fas fa-shopping-cart"></i> Carrito de Compra</h4>
+            <hr>
+            <div class="cart-items">
+                {% for item in cart_items %}
+                <div class="cart-item">
+                    <div class="cart-item-info">
+                        <span class="name">{{ item.name }}</span>
+                        <span>${{ item.price|floatformat:2 }} x {{ item.quantity }} = ${{ item.subtotal|floatformat:2 }}</span>
+                    </div>
+                    <div class="cart-item-actions">
+                         {# Formulario para actualizar cantidad #}
+                         <form action="{% url 'sales:update_cart' item.product_id %}{% if search_query or selected_category %}?q={{ search_query|default:'' }}&category={{ selected_category|default:'' }}{% endif %}" method="post" style="display: inline-flex; align-items: center;">
+                             {% csrf_token %}
+                             <input type="number" name="quantity" value="{{ item.quantity }}" min="1" class="form-control form-control-sm" style="width: 60px;">
+                             <button type="submit" class="update-btn" title="Actualizar cantidad"><i class="fas fa-sync-alt"></i></button>
+                         </form>
+                         {# Botón/Enlace para eliminar #}
+                         <a href="{% url 'sales:remove_from_cart' item.product_id %}{% if search_query or selected_category %}?q={{ search_query|default:'' }}&category={{ selected_category|default:'' }}{% endif %}" title="Eliminar item" class="text-danger" style="background: none; border: none; cursor: pointer; font-size: 1.1em; padding: 0 5px;"><i class="fas fa-trash-alt"></i></a>
+                    </div>
+                </div>
+                {% empty %}
+                <p style="text-align: center; color: #888;">El carrito está vacío.</p>
+                {% endfor %}
+            </div>
+
+            {% if cart_items %}
+            <div class="cart-summary">
+                <p>Subtotal: <span>${{ cart_total|floatformat:2 }}</span></p>
+                {# Puedes añadir impuestos, descuentos aquí si los calculas en la vista #}
+                <p class="total">Total: <span>${{ cart_total|floatformat:2 }}</span></p> {# Asume total = subtotal por ahora #}
+            </div>
+            <div class="cart-actions">
+                 <a href="{% url 'sales:clear_cart' %}{% if search_query or selected_category %}?q={{ search_query|default:'' }}&category={{ selected_category|default:'' }}{% endif %}" class="btn btn-warning btn-sm"><i class="fas fa-times-circle"></i> Vaciar Carrito</a>
+                 {# El botón Pagar apunta a la vista checkout #}
+                 <form action="{% url 'sales:checkout' %}" method="post" style="width:100%;">
+                     {% csrf_token %}
+                     <button type="submit" class="btn-checkout">
+                         <i class="fas fa-credit-card"></i> Proceder al Pago
+                     </button>
+                 </form>
+            </div>
+             {% endif %}
+        </div>
+    </div>
+</div>
+
+{# Incluye FontAwesome si no lo tienes en tu base.html #}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+{% endblock %}
