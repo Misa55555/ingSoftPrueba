@@ -1,0 +1,9 @@
+
+
+ERROR-1:
+Actualmente estoy teniendo un problema, que a la hora de poner en efectivo me salta que uno de los numeros calculados
+es un decimal, entonces, como uno se mantiene de forma decimal y el otro float, hay un problema.
+Entonces hay que buscar especificamente la parte en la cual pueda cambiar la variable "total_car" pero el tema es que
+a medida que se va trasformando ese total_car se modifica cada rato entonces es dificil encontrar en que parte falla o aplicar una
+excepcion en caso de que el numero llegue de una forma que no esperamos.
+

@@ -149,12 +149,17 @@
             <div class="cart-actions">
                  <a href="{% url 'sales:clear_cart' %}{% if search_query or selected_category %}?q={{ search_query|default:'' }}&category={{ selected_category|default:'' }}{% endif %}" class="btn btn-warning btn-sm"><i class="fas fa-times-circle"></i> Vaciar Carrito</a>
                  {# El botón Pagar apunta a la vista checkout #}
-                 <form action="{% url 'sales:checkout' %}" method="post" style="width:100%;">
-                     {% csrf_token %}
-                     <button type="submit" class="btn-checkout">
-                         <i class="fas fa-credit-card"></i> Proceder al Pago
-                     </button>
-                 </form>
+                 <div class="cart-actions">
+                    <a href="{% url 'sales:clear_cart' %}{% if search_query or selected_category %}?q={{ search_query|default:'' }}&category={{ selected_category|default:'' }}{% endif %}" class="btn btn-warning btn-sm"><i class="fas fa-times-circle"></i> Vaciar Carrito</a>
+                    {# El botón Pagar apunta a la vista checkout - Forma INCORRECTA previa: #}
+                    {# Fin Forma INCORRECTA #}
+   
+                    {# === Forma CORRECTA: Un simple enlace === #}
+                    <a href="{% url 'sales:checkout' %}" class="btn-checkout" style="text-align: center; display: block; width: auto; margin-left: auto;"> {# Ajusta el estilo según necesites #}
+                       <i class="fas fa-credit-card"></i> Proceder al Pago
+                    </a>
+                    {# === Fin Forma CORRECTA === #}
+               </div>
             </div>
              {% endif %}
         </div>

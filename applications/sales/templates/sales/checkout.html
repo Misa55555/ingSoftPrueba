@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+{% load humanize %} {# Opcional para formatos #}
+
+{% block title %}Confirmar Pago{% endblock %}
+
+{% block content %}
+<style>
+    /* Estilos básicos para la demo - Añade/ajusta según necesites */
+    .checkout-container { display: flex; gap: 30px; flex-wrap: wrap; }
+    .checkout-form-section { flex: 2; min-width: 350px; }
+    .order-summary-section { flex: 1; min-width: 250px; border: 1px solid #ccc; padding: 20px; border-radius: 8px; background-color: #f8f9fa; }
+    .order-summary-section h4 { margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+    .summary-item { display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 8px; }
+    .summary-item .name { color: #555; }
+    .summary-totals { border-top: 1px solid #ddd; margin-top: 15px; padding-top: 15px; }
+    .summary-totals p { display: flex; justify-content: space-between; margin: 5px 0; }
+    .summary-totals .total { font-weight: bold; font-size: 1.2em; }
+
+    .form-section { margin-bottom: 25px; border: 1px solid #eee; padding: 20px; border-radius: 8px;}
+    .form-section h4 { margin-top: 0; color: #0056b3; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+    .form-group select, .form-group textarea {
+        width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+    }
+     .form-group textarea { height: 80px; }
+
+    .btn-confirm-sale {
+        display: block; width: 100%; padding: 15px; background-color: #28a745; color: white;
+        font-size: 1.3em; text-align: center; border: none; border-radius: 5px; cursor: pointer;
+        margin-top: 20px;
+    }
+    .btn-confirm-sale:hover { background-color: #218838; }
+    .btn-cancel { display: inline-block; margin-top: 15px; color: #6c757d; text-decoration: none; }
+    .btn-cancel:hover { text-decoration: underline; }
+
+    /* Estilos para mensajes de Django (igual que en pos_interface.html) */
+     .messages { list-style: none; padding: 0; margin-bottom: 15px; }
+     .messages li { padding: 10px 15px; margin-bottom: 10px; border-radius: 4px; }
+     .messages li.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+     .messages li.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+     .messages li.warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+     .messages li.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+     /* Estilos para botones de método de pago */
+    .payment-methods { display: flex; gap: 10px; margin-bottom: 20px; }
+    .payment-methods label {
+        flex: 1;
+        padding: 15px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        text-align: center;
+        cursor: pointer;
+        background-color: white;
+        transition: background-color 0.3s, border-color 0.3s;
+    }
+    .payment-methods input[type="radio"] { display: none; /* Ocultar el radio button real */ }
+    .payment-methods input[type="radio"]:checked + label {
+        border-color: #007bff;
+        background-color: #e7f1ff;
+        font-weight: bold;
+    }
+    .payment-methods label i { display: block; font-size: 1.5em; margin-bottom: 5px; }
+
+    /* Estilos para campos de efectivo (inicialmente ocultos) */
+    .cash-fields {
+        display: none; /* Oculto por defecto */
+        margin-top: 15px;
+        padding: 15px;
+        background-color: #f0f0f0;
+        border-radius: 5px;
+    }
+    .cash-fields.visible { display: block; /* Se muestra con JS */ }
+    .cash-fields .form-group { display: flex; gap: 15px; align-items: center; }
+    .cash-fields .form-group label { flex-basis: 150px; /* Ancho fijo para la etiqueta */ margin-bottom: 0; }
+    .cash-fields .form-group input, .cash-fields .form-group span { flex-grow: 1; }
+    .cash-fields input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    #change_display { font-weight: bold; font-size: 1.1em; color: #28a745; }
+
+</style>
+
+<div class="container mt-4">
+    <h2><i class="fas fa-credit-card"></i> Finalizar Venta</h2>
+    <hr>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <div class="checkout-container">
+        <div class="checkout-form-section">
+            <form method="post" action="{% url 'sales:checkout' %}" id="checkout-form">
+                {% csrf_token %}
+
+                <div class="form-section">
+                     <h4><i class="fas fa-user"></i> Cliente</h4>
+                     <div class="form-group">
+                         <label for="client_id">Seleccionar Cliente (Opcional)</label>
+                         <select name="client_id" id="client_id" class="form-control">
+                             <option value="">-- Consumidor Final --</option>
+                             {% for client in clients %}
+                             <option value="{{ client.id }}" {% if client.id|stringformat:"s" == selected_client_id %}selected{% endif %}>
+                                 {{ client.client_name }} ({{ client.email|default:'Sin email' }})
+                             </option>
+                             {% endfor %}
+                         </select>
+                     </div>
+                 </div>
+
+                <div class="form-section">
+                    <h4><i class="fas fa-money-bill-wave"></i> Método de Pago</h4>
+                    <div class="payment-methods">
+                        {# Iterar sobre las opciones definidas en el modelo (o hardcodearlas) #}
+                        {# Asumiendo que pasas PAYMENT_METHOD_CHOICES desde la vista o las defines aquí #}
+                        {% with payment_choices=Sale.PAYMENT_METHOD_CHOICES %} {# Acceder a choices del modelo #}
+                        <input type="radio" name="payment_method" value="cash" id="pay_cash" checked>
+                        <label for="pay_cash">
+                            <i class="fas fa-money-bill-alt"></i> Efectivo
+                        </label>
+
+                        <input type="radio" name="payment_method" value="card" id="pay_card">
+                        <label for="pay_card">
+                            <i class="fas fa-credit-card"></i> Tarjeta
+                        </label>
+
+                        <input type="radio" name="payment_method" value="transfer" id="pay_transfer">
+                        <label for="pay_transfer">
+                            <i class="fas fa-exchange-alt"></i> Transferencia
+                        </label>
+                        {% endwith %}
+                    </div>
+
+                    <div class="cash-fields" id="cash-fields-container">
+                        <div class="form-group">
+                            <label for="amount_received">Efectivo Recibido:</label>
+                            <input type="number" name="amount_received" id="amount_received" step="0.01" min="0" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>Cambio a Devolver:</label>
+                            <span id="change_display">$0.00</span>
+                        </div>
+                         <small id="cash-error" style="color: red; display: none;">El efectivo recibido debe ser mayor o igual al total.</small>
+                    </div>
+                </div>
+
+                 <div class="form-section">
+                     <h4><i class="fas fa-sticky-note"></i> Notas Adicionales</h4>
+                     <div class="form-group">
+                         <label for="notes">Notas (opcional)</label>
+                         <textarea name="notes" id="notes" class="form-control" placeholder="Añadir notas o comentarios sobre la venta...">{{ request.POST.notes|default:'' }}</textarea> {# Mantener valor si hay error #}
+                     </div>
+                 </div>
+
+                 <button type="submit" class="btn-confirm-sale">
+                     <i class="fas fa-check-circle"></i> Confirmar y Registrar Venta
+                 </button>
+                 <a href="{% url 'sales:pos_view' %}" class="btn-cancel">Cancelar y volver</a>
+            </form>
+        </div>
+
+        <div class="order-summary-section">
+            <h4>Resumen de la Compra</h4>
+            {# ... (contenido del resumen igual que antes) ... #}
+             <div class="summary-items">
+                 {% for item in cart_items %}
+                 <div class="summary-item">
+                     <span class="name">{{ item.quantity }} x {{ item.name }}</span>
+                     <span class="price">${{ item.subtotal|floatformat:2 }}</span>
+                 </div>
+                 {% empty %}
+                 <p>No hay items.</p>
+                 {% endfor %}
+             </div>
+             <div class="summary-totals">
+                 <p>Subtotal: <span>${{ cart_total|floatformat:2 }}</span></p>
+                 <p class="total" id="total-amount" data-total="{{ cart_total|stringformat:'.2f' }}">Total a Pagar: <span>${{ cart_total|floatformat:2 }}</span></p> {# Añadido ID y data-total para JS #}
+             </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %} {# Bloque para añadir JS al final del body #}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentMethodRadios = document.querySelectorAll('input[name="payment_method"]');
+    const cashFieldsContainer = document.getElementById('cash-fields-container');
+    const amountReceivedInput = document.getElementById('amount_received');
+    const changeDisplay = document.getElementById('change_display');
+    const totalAmountElement = document.getElementById('total-amount');
+    const cashErrorMsg = document.getElementById('cash-error');
+    const checkoutForm = document.getElementById('checkout-form'); // Formulario principal
+
+    // Obtener el monto total del atributo data-* o directamente si es seguro
+    const totalAmount = parseFloat(totalAmountElement.dataset.total || '0');
+
+    function toggleCashFields() {
+        const selectedMethod = document.querySelector('input[name="payment_method"]:checked').value;
+        if (selectedMethod === 'cash') {
+            cashFieldsContainer.classList.add('visible');
+            amountReceivedInput.required = true; // Hacer requerido si es efectivo
+             calculateChange(); // Calcular cambio al mostrar
+        } else {
+            cashFieldsContainer.classList.remove('visible');
+            amountReceivedInput.required = false; // No requerido si no es efectivo
+            amountReceivedInput.value = ''; // Limpiar campo al ocultar
+            changeDisplay.textContent = '$0.00'; // Resetear cambio
+            cashErrorMsg.style.display = 'none'; // Ocultar error
+        }
+    }
+
+    function calculateChange() {
+        const amountReceived = parseFloat(amountReceivedInput.value || '0');
+        let change = 0.00;
+        let error = false;
+
+        if (amountReceived >= totalAmount) {
+            change = amountReceived - totalAmount;
+            cashErrorMsg.style.display = 'none';
+            error = false;
+        } else if (amountReceived > 0 && amountReceived < totalAmount) {
+             // Mostrar error si se ingresó algo pero es insuficiente
+             cashErrorMsg.style.display = 'block';
+             change = 0.00; // No mostrar cambio negativo
+             error = true; // Marcar error para posible validación en submit
+        }
+         else {
+            // Si el campo está vacío o es 0, no mostrar error aún, pero el cambio es 0
+             cashErrorMsg.style.display = 'none';
+             change = 0.00;
+             error = false; // No es un error si está vacío, pero será inválido al enviar si es requerido
+        }
+
+        // Formatear como moneda
+        changeDisplay.textContent = `$${change.toFixed(2)}`;
+        return !error; // Devuelve true si no hay error de monto insuficiente
+    }
+
+    // Mostrar/ocultar campos al cambiar método de pago
+    paymentMethodRadios.forEach(radio => {
+        radio.addEventListener('change', toggleCashFields);
+    });
+
+    // Calcular cambio al escribir en "Efectivo Recibido"
+    if (amountReceivedInput) {
+        amountReceivedInput.addEventListener('input', calculateChange);
+    }
+
+     // --- Validación Opcional al Enviar ---
+     if (checkoutForm) {
+         checkoutForm.addEventListener('submit', function(event) {
+             const selectedMethod = document.querySelector('input[name="payment_method"]:checked').value;
+             if (selectedMethod === 'cash') {
+                 if (!calculateChange()) { // Si calculateChange devuelve false (por monto insuficiente)
+                     event.preventDefault(); // Detener el envío del formulario
+                     messages.error(request, "El efectivo recibido debe ser mayor o igual al total."); // No funciona message.error aqui
+                     alert("Error: El efectivo recibido debe ser mayor o igual al total."); // Usar alert como fallback simple
+                     amountReceivedInput.focus(); // Poner foco en el campo
+                 } else if (!amountReceivedInput.value || parseFloat(amountReceivedInput.value || '0') <= 0) {
+                     // También validar que no esté vacío o sea cero si es efectivo
+                     event.preventDefault();
+                     alert("Error: Debe ingresar el monto recibido en efectivo.");
+                     amountReceivedInput.focus();
+                 }
+             }
+         });
+     }
+
+
+    // Llamada inicial para establecer el estado correcto al cargar la página
+    toggleCashFields();
+
+});
+</script>
+{% endblock %}
