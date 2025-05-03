@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}Historial - StockPro{% endblock %}
+
+{% block content %}
+<h1>Historial de Ventas</h1>
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha y Hora</th>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Unidades</th>
+            <th>Tipo de Unidad</th>
+            <th>Precio Compra</th>
+            <th>Precio Venta</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-historial-ventas"></tbody>
+      </table>
+{% endblock %}

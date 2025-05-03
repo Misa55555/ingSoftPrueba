@@ -1,63 +1,7 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Análisis - StockPro</title>
-  <link rel="stylesheet" href="{% static 'style.css' %}">
-</head>
-<body>
-  <div class="container">
-    <aside class="sidebar">
-        <a href="{% url 'home' %}" class="logo">
-            <span class="icon">📈</span>
-            <span class="text">StockPro</span>
-        </a>
-          
-        <p class="user">
-            <span class="icon">👤</span>
-            <span class="text">Valentín Marta</span>
-        </p>
-      
-        <nav>
-          <a href="{% url 'compras' %}" class="menu-item">
-            <span class="icon">🛒</span>
-            <span class="text">Compras</span>
-          </a>
-          <a href="{% url 'ventas' %}" class="menu-item">
-            <span class="icon">💼</span>
-            <span class="text">Ventas</span>
-          </a>
-          <a href="{% url 'analisis' %}" class="menu-item">
-            <span class="icon">📊</span>
-            <span class="text">Análisis Financiero</span>
-          </a>
-          <a href="{% url 'historial_compras' %}" class="menu-item">
-            <span class="icon">🕒</span>
-            <span class="text">Historial</span>
-          </a>
-          <a href="{% url 'stock' %}" class="menu-item">
-            <span class="icon">📦</span>
-            <span class="text">Stock de Productos</span>
-          </a>
-        </nav>
+{% extends 'base.html' %}
 
-        <div class="sidebar-footer">
-            <a href="#" class="menu-item">
-              <span class="icon">⚙️</span>
-              <span class="text">Configuración</span>
-            </a>
-            <a href="#" class="menu-item">
-              <span class="icon">🔒</span>
-              <span class="text">Cerrar sesión</span>
-            </a>
-        </div>
-          
-    </aside>
-      
-    <main class="dashboard">
-      <h1>Página en blanco: Análisis</h1>
-    </main>
-  </div>
-</body>
-</html>
+{% block title %}Analisis - StockPro{% endblock %}
+
+{% block content %}
+<h1>Página en blanco: Analisis</h1>
+{% endblock %}
