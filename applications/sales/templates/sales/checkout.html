@@ -79,6 +79,8 @@
 
 </style>
 
+
+
 <div class="container mt-4">
     <h2><i class="fas fa-credit-card"></i> Finalizar Venta</h2>
     <hr>
@@ -97,19 +99,27 @@
                 {% csrf_token %}
 
                 <div class="form-section">
-                     <h4><i class="fas fa-user"></i> Cliente</h4>
-                     <div class="form-group">
-                         <label for="client_id">Seleccionar Cliente (Opcional)</label>
-                         <select name="client_id" id="client_id" class="form-control">
-                             <option value="">-- Consumidor Final --</option>
-                             {% for client in clients %}
-                             <option value="{{ client.id }}" {% if client.id|stringformat:"s" == selected_client_id %}selected{% endif %}>
-                                 {{ client.client_name }} ({{ client.email|default:'Sin email' }})
-                             </option>
-                             {% endfor %}
-                         </select>
-                     </div>
-                 </div>
+                    <h4><i class="fas fa-user"></i> Cliente</h4>
+                    <div class="form-group">
+                        <label for="client_id">Seleccionar Cliente (Opcional)</label>
+                        <div style="display: flex; gap: 10px; align-items: center;"> {# Contenedor para select y botón #}
+                            <select name="client_id" id="client_id" class="form-control" style="flex-grow: 1;">
+                                <option value="">-- Consumidor Final --</option>
+                                {% for client in clients %}
+                                <option value="{{ client.id }}" {% if client.id|stringformat:"s" == selected_client_id %}selected{% endif %}>
+                                    {# Mostrar Nombre (CUIT/CUIL - Condición IVA) #}
+                                    {{ client.client_name }} {% if client.tax_id %}({{ client.tax_id }} - {{ client.get_tax_condition_display }}){% else %}({{ client.get_tax_condition_display }}){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {# --- Enlace para Añadir Nuevo Cliente --- #}
+                            <a href="{% url 'sales:add_client' %}" class="btn btn-secondary btn-sm" title="Añadir Nuevo Cliente">
+                                <i class="fas fa-plus"></i> Añadir
+                            </a>
+                            {# -------------------------------------- #}
+                        </div>
+                    </div>
+                </div>
 
                 <div class="form-section">
                     <h4><i class="fas fa-money-bill-wave"></i> Método de Pago</h4>

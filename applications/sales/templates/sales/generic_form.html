@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title|default:"Formulario" }}{% endblock %}
+
+{% block content %}
+<style>
+    .form-container { max-width: 600px; margin: 20px auto; padding: 25px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; }
+    .form-container h2 { margin-top: 0; text-align: center; margin-bottom: 20px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+    .form-group input[type="text"],
+    .form-group input[type="email"],
+    .form-group input[type="tel"],
+    .form-group select,
+    .form-group textarea {
+        width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+    }
+     .form-group textarea { min-height: 80px; }
+     .form-group .helptext { font-size: 0.85em; color: #666; margin-top: 4px; }
+     .form-errors { color: red; font-size: 0.9em; list-style-type: none; padding-left: 0; margin-top: 5px; }
+
+     .form-actions { margin-top: 25px; text-align: right; }
+     .form-actions button { padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; }
+     .form-actions button:hover { background-color: #218838; }
+     .form-actions a { margin-left: 10px; color: #6c757d; text-decoration: none; }
+     .form-actions a:hover { text-decoration: underline; }
+
+     /* Estilos para mensajes de Django (igual que antes) */
+     .messages { list-style: none; padding: 0; margin-bottom: 15px; }
+     .messages li { padding: 10px 15px; margin-bottom: 10px; border-radius: 4px; }
+     /* ... (clases success, info, warning, error igual que antes) ... */
+     .messages li.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+     .messages li.info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+     .messages li.warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+     .messages li.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+</style>
+
+<div class="form-container">
+    <h2>{{ title|default:"Completar Formulario" }}</h2>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        {% for field in form %}
+        <div class="form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+            {{ field }} {# Renderizar el campo del formulario #}
+            {% if field.help_text %}
+            <p class="helptext">{{ field.help_text|safe }}</p>
+            {% endif %}
+            {% if field.errors %}
+            <ul class="form-errors">
+                {% for error in field.errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        {# Errores generales del formulario (no asociados a un campo) #}
+        {% if form.non_field_errors %}
+        <div class="form-group">
+             <ul class="form-errors">
+                {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+            <button type="submit">Guardar</button>
+            {# Botón para cancelar y volver al checkout #}
+            <a href="{% url 'sales:checkout' %}">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

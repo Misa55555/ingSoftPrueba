@@ -1,0 +1,150 @@
+{% load humanize %} {# Para formatos si lo tienes activado #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recibo Venta #{{ sale.id }}</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace; /* Fuente típica de recibo */
+            margin: 0;
+            padding: 15px;
+            background-color: #fff; /* Fondo blanco para impresión */
+            color: #000;
+            font-size: 10pt; /* Tamaño pequeño típico */
+            line-height: 1.4;
+        }
+        .receipt-container {
+            max-width: 300px; /* Ancho típico de ticketera */
+            margin: 0 auto;
+            border: 1px dashed #ccc; /* Borde punteado opcional */
+            padding: 10px;
+        }
+        header, footer { text-align: center; margin-bottom: 15px; }
+        header h1 { margin: 0; font-size: 1.2em; }
+        header p { margin: 2px 0; font-size: 0.9em;}
+        .sale-info p, .client-info p { margin: 3px 0; }
+        .items-table { width: 100%; margin-top: 15px; border-collapse: collapse; }
+        .items-table th, .items-table td {
+            text-align: left;
+            padding: 4px 2px;
+            border-bottom: 1px dotted #eee; /* Línea punteada entre items */
+        }
+        .items-table th { font-weight: bold; border-bottom: 1px solid #000; }
+        .items-table td.qty, .items-table td.price, .items-table td.subtotal { text-align: right; }
+        .totals { margin-top: 15px; padding-top: 10px; border-top: 1px solid #000; }
+        .totals p { display: flex; justify-content: space-between; margin: 4px 0; font-weight: bold; }
+        .payment-info { margin-top: 10px; font-size: 0.9em; }
+        .notes { margin-top: 10px; font-style: italic; font-size: 0.9em; word-wrap: break-word; }
+        footer p { margin: 5px 0; font-size: 0.9em; }
+        .print-button { display: block; width: 100%; padding: 10px; margin-top: 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; text-align: center; }
+
+        /* Estilos específicos para impresión */
+        @media print {
+            body { margin: 0; padding: 0; font-size: 9pt; } /* Ajustar tamaño para impresión */
+            .receipt-container { max-width: 100%; border: none; margin: 0; padding: 0; }
+            .print-button { display: none; /* Ocultar botón al imprimir */ }
+            footer { page-break-after: always; } /* Evitar que se corte el footer (puede no funcionar siempre) */
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container">
+        <header>
+            <h1>{{ company_name }}</h1>
+            <p>{{ company_address }}</p>
+            <p>Tel: {{ company_phone }}</p>
+            {# Aquí irían datos fiscales (CUIT, etc.) que vendrán de Ajustes #}
+            <p>----------------------------------------</p>
+        </header>
+
+        <section class="sale-info">
+            <p><strong>Venta #:</strong> {{ sale.id }}</p>
+            <p><strong>Fecha:</strong> {{ sale.sale_date|date:"d/m/Y H:i" }}</p>
+            <p><strong>Vendedor:</strong> {{ sale.seller.username|default:"N/A" }}</p>
+        </section>
+
+        {% if sale.client %}
+        <section class="client-info">
+             <p>----------------------------------------</p>
+             <p><strong>Cliente:</strong> {{ sale.client.client_name }}</p>
+             {# Mostrar más datos del cliente si es necesario para factura #}
+             {% if sale.client.address %}<p>Dirección: {{ sale.client.address }}</p>{% endif %}
+             {% if sale.client.phone %}<p>Tel: {{ sale.client.phone }}</p>{% endif %}
+             {# Aquí iría el CUIT/CUIL para facturas A/B #}
+        </section>
+        {% else %}
+        <section class="client-info">
+            <p>----------------------------------------</p>
+            <p><strong>Cliente:</strong> Consumidor Final</p>
+        </section>
+        {% endif %}
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th class="qty">Cant</th>
+                    <th class="price">P.Unit</th>
+                    <th class="subtotal">Subt</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for detail in sale.details.all %}
+                <tr>
+                    <td>{{ detail.product.name|truncatechars:20 }}</td> {# Truncar nombre si es muy largo #}
+                    <td class="qty">{{ detail.quantity }}</td>
+                    <td class="price">${{ detail.unit_price|floatformat:2 }}</td>
+                    <td class="subtotal">${{ detail.subtotal|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <section class="totals">
+            {# Mostrar subtotal si es diferente del total (ej. por descuentos futuros) #}
+            {# <p>Subtotal: <span>${{ subtotal_placeholder|floatformat:2 }}</span></p> #}
+            {# <p>Descuento: <span>-${{ sale.discount_amount|floatformat:2 }}</span></p> #}
+            <p>TOTAL: <span>${{ sale.total_amount|floatformat:2 }}</span></p>
+        </section>
+
+        <section class="payment-info">
+             <p>----------------------------------------</p>
+             <p><strong>Forma de Pago:</strong> {{ sale.get_payment_method_display }}</p> {# Muestra el valor legible #}
+             {% if sale.payment_method == 'cash' and sale.amount_received is not None %}
+                 <p>Recibido: ${{ sale.amount_received|floatformat:2 }}</p>
+                 <p>Cambio: ${{ sale.change_given|floatformat:2 }}</p>
+             {% endif %}
+             {# Aquí mostraríamos detalles de tarjeta/transferencia si los guardamos #}
+        </section>
+
+        {% if sale.notes %}
+        <section class="notes">
+            <p>----------------------------------------</p>
+            <p><strong>Notas:</strong> {{ sale.notes }}</p>
+        </section>
+        {% endif %}
+
+        <footer>
+             <p>----------------------------------------</p>
+             <p>¡Gracias por su compra!</p>
+             {# Puedes añadir información de garantía, web, etc. #}
+        </footer>
+
+    </div> {# Fin receipt-container #}
+
+    {# Botón para imprimir que se oculta en la impresión #}
+    <button onclick="window.print();" class="print-button">
+        <i class="fas fa-print"></i> Imprimir Recibo
+    </button>
+
+    {# Enlace para volver al POS #}
+    <div style="text-align: center; margin-top: 10px;">
+        <a href="{% url 'sales:pos_view' %}" style="font-family: sans-serif; font-size: 1em; color: #007bff;">&laquo; Volver a Ventas</a>
+    </div>
+
+    {# Necesitarás FontAwesome si usas los iconos #}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+</body>
+</html>

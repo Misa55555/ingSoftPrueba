@@ -7,3 +7,8 @@ Entonces hay que buscar especificamente la parte en la cual pueda cambiar la var
 a medida que se va trasformando ese total_car se modifica cada rato entonces es dificil encontrar en que parte falla o aplicar una
 excepcion en caso de que el numero llegue de una forma que no esperamos.
 
+
+
+ERROR-2
+Falta poner añador el boton de + para agregar un cliente 
+8.sales/templates/sales/checkout.html

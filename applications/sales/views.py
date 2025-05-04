@@ -16,6 +16,8 @@ from django.db.models import F # Para actualizar stock de forma segura
 from .models import Client, Sale, SaleDetail
 # --- Helper Functions for Cart (Funciones de Ayuda para el Carrito) ---
 from decimal import Decimal, InvalidOperation # Importar Decimal e InvalidOperation
+from .forms import ClientForm # Importar el nuevo formulario
+from django.urls import reverse_lazy # Para redirección
 
 def get_cart(request):
     """Obtiene el carrito de la sesión o crea uno nuevo si no existe."""
@@ -32,9 +34,23 @@ def save_cart(request, cart):
     request.session.modified = True
 
 def calculate_cart_total(cart):
-    """Calcula el total del carrito."""
-    total = sum(item['quantity'] * item['price'] for item in cart.values())
-    return round(total, 2)
+    """Calcula el total del carrito usando Decimal."""
+    total = Decimal('0.00') # Inicializar como Decimal
+    for item in cart.values():
+        try:
+            # Convertir cantidad (int) y precio (str) a Decimal para multiplicar
+            quantity = Decimal(item.get('quantity', 0))
+            price = Decimal(item.get('price', '0.00'))
+            total += quantity * price
+        except (InvalidOperation, TypeError, KeyError):
+             # Manejar posible error si los datos del carrito son inválidos
+             # Puedes loggear un error aquí si quieres
+             print(f"Advertencia: Item inválido en el carrito: {item}")
+             continue # Saltar este item
+
+    # No necesitas round() si operas solo con Decimal y tus precios tienen 2 decimales
+    # .quantize asegura que el resultado tenga exactamente 2 decimales
+    return total.quantize(Decimal('0.01'))
 
 # --- Views (Vistas) ---
 
@@ -110,15 +126,18 @@ def add_to_cart(request, product_id):
         # Añadir nuevo producto al carrito
         cart[product_id_str] = {
             'quantity': 1,
-            'price': float(product.price), # Guardar precio actual como float
+            'price': str(product.price), # Guardar precio actual como float
             'name': product.name # Guardar nombre para fácil acceso (opcional)
         }
         messages.success(request, f"'{product.name}' añadido al carrito.")
 
     save_cart(request, cart)
-    # Redirigir de vuelta a la vista POS
-    # Es mejor usar reverse para evitar hardcodear URLs
-    return redirect(reverse('sales:pos_view') + f'?q={request.GET.get("q","")}&category={request.GET.get("category","")}')
+    # Preservar filtros/búsqueda en redirección
+    redirect_url = reverse('sales:pos_view')
+    query_params = request.GET.urlencode()
+    if query_params:
+        redirect_url += '?' + query_params
+    return redirect(redirect_url)
 
 @login_required
 def remove_from_cart(request, product_id):
@@ -191,6 +210,9 @@ def checkout_view(request):
     cart_total = calculate_cart_total(cart)
     clients = Client.objects.all()
     payment_choices = Sale.PAYMENT_METHOD_CHOICES # Pasar choices a la plantilla
+
+    # --- Leer posible cliente nuevo de la URL ---
+    new_client_id_from_url = request.GET.get('new_client_id')
 
     if request.method == 'POST':
         client_id = request.POST.get('client_id')
@@ -305,7 +327,7 @@ def checkout_view(request):
 
             # 5. Redirigir (sin cambios)
             messages.success(request, f"¡Venta #{sale.id} registrada exitosamente!")
-            return redirect('sales:pos_view')
+            return redirect(reverse('sales:sale_receipt', args=[sale.id]))
 
         except ValueError as e: # Error de stock
             messages.error(request, str(e))
@@ -327,15 +349,79 @@ def checkout_view(request):
 
     else: # Método GET
         cart_items_detailed = get_detailed_cart_items(cart)
+        selected_client_id_on_load = new_client_id_from_url or '' # Usar el de la URL si existe
         context = {
             'cart': cart,
             'cart_items': cart_items_detailed,
             'cart_total': cart_total,
             'clients': clients,
             'payment_choices': payment_choices, # Pasar choices a la plantilla
+            'selected_client_id': selected_client_id_on_load, # <--- Usar para preseleccionar
         }
         return render(request, 'sales/checkout.html', context)
 
+
+@login_required
+def sale_receipt_view(request, sale_id):
+    """
+    Muestra los detalles de una venta específica en formato de recibo.
+    """
+    try:
+        # Optimizamos la consulta para obtener datos relacionados eficientemente
+        sale = Sale.objects.select_related('client', 'seller').prefetch_related(
+            'details', # Prefetch detalles
+            'details__product', # Prefetch producto dentro de detalles
+            'details__product__brand', # Prefetch marca dentro de producto (opcional)
+            'details__product__category' # Prefetch categoría dentro de producto (opcional)
+        ).get(id=sale_id)
+
+        # Podrías añadir una verificación extra, por ejemplo,
+        # si solo el vendedor que hizo la venta o un admin puede verla.
+        # if not request.user.is_staff and sale.seller != request.user:
+        #     messages.error(request, "No tienes permiso para ver este recibo.")
+        #     return redirect('sales:pos_view') # O a donde corresponda
+
+    except Sale.DoesNotExist:
+        messages.error(request, "La venta solicitada no existe.")
+        return redirect('sales:pos_view') # O a una página de historial de ventas
+
+    context = {
+        'sale': sale,
+        # Podrías pasar datos de la 'empresa' aquí desde settings más adelante
+        'company_name': "Mi Negocio XYZ (Placeholder)",
+        'company_address': "Calle Falsa 123, Ciudad (Placeholder)",
+        'company_phone': "+54 9 351 1234567 (Placeholder)",
+    }
+    return render(request, 'sales/receipt.html', context)
+
+@login_required
+def add_client_view(request):
+    """
+    Maneja la creación de un nuevo cliente.
+    Redirige de vuelta al checkout pre-seleccionando el cliente creado.
+    """
+    if request.method == 'POST':
+        form = ClientForm(request.POST)
+        if form.is_valid():
+            try:
+                new_client = form.save()
+                messages.success(request, f"Cliente '{new_client.client_name}' añadido exitosamente.")
+                # Redirigir de vuelta al checkout, pasando el ID del nuevo cliente
+                checkout_url = reverse('sales:checkout')
+                return redirect(f'{checkout_url}?new_client_id={new_client.id}')
+            except Exception as e:
+                # Capturar errores inesperados al guardar (ej. CUIT duplicado no manejado por form)
+                messages.error(request, f"Error al guardar el cliente: {e}")
+                # Se vuelve a mostrar el formulario con los errores implícitos del form
+    else: # Método GET
+        form = ClientForm()
+
+    context = {
+        'form': form,
+        'title': 'Añadir Nuevo Cliente'
+    }
+    # Reutilizamos una plantilla genérica de formulario o creamos una específica
+    return render(request, 'sales/generic_form.html', context)
 
 # --- Helper Adicional (similar al de pos_view) ---
 # (Puedes mover esto y los otros helpers a un archivo 'utils.py' e importarlos)

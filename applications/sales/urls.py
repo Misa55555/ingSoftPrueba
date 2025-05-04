@@ -13,4 +13,6 @@ urlpatterns = [
     path('update-cart/<int:product_id>/', views.update_cart, name='update_cart'), # Para actualizar cantidad
     path('clear-cart/', views.clear_cart, name='clear_cart'),
     path('checkout/', views.checkout_view, name='checkout'), # Placeholder para el botón "Pagar"
+    path('receipt/<int:sale_id>/', views.sale_receipt_view, name='sale_receipt'), #Recibo del cliente
+    path('clients/add/', views.add_client_view, name='add_client'),
 ]

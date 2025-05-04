@@ -6,20 +6,63 @@ from applications.stock.models import Product # Importa el modelo Product de la 
 from django.utils import timezone
 from decimal import Decimal
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
+
+cuit_cuil_validator = RegexValidator(
+    regex=r'^\d{2}-\d{8}-\d{1}$',
+    message="El formato debe ser XX-XXXXXXXX-X."
+)
 
 class Client(models.Model):
-    # id_client es automático (id)
-    client_name = models.CharField(max_length=150, verbose_name="Nombre")
-    address = models.TextField(blank=True, null=True, verbose_name="Dirección")
+    # --- Choices para Condición frente al IVA ---
+    TAX_CONDITION_CHOICES = [
+        ('CF', 'Consumidor Final'),
+        ('RI', 'Responsable Inscripto'),
+        ('MO', 'Monotributista'),
+        ('EX', 'Exento'),
+        # Añadir otros si son necesarios
+    ]
+
+    client_name = models.CharField(max_length=150, verbose_name="Nombre o Razón Social")
+    # CUIT/CUIL - Hacerlo único y opcional (un Consumidor Final puede no tenerlo registrado)
+    tax_id = models.CharField(
+        max_length=13, # Formato XX-XXXXXXXX-X
+        unique=True,
+        null=True, # Permitir nulo
+        blank=True, # Permitir vacío en formularios
+        validators=[cuit_cuil_validator],
+        verbose_name="CUIT/CUIL"
+    )
+    tax_condition = models.CharField(
+        max_length=2,
+        choices=TAX_CONDITION_CHOICES,
+        default='CF', # Default a Consumidor Final
+        verbose_name="Condición IVA"
+    )
+    address = models.TextField(blank=True, null=True, verbose_name="Dirección Fiscal")
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Teléfono")
     email = models.EmailField(blank=True, null=True, verbose_name="Email")
+
 
     class Meta:
         verbose_name = "Cliente"
         verbose_name_plural = "Clientes"
+        ordering = ['client_name']
 
     def __str__(self):
-        return self.client_name
+        base = self.client_name
+        if self.tax_id:
+            base += f" ({self.tax_id})"
+        return base
+
+    def clean(self):
+        # Validación: Si no es Consumidor Final, CUIT/CUIL debería ser obligatorio
+        if self.tax_condition != 'CF' and not self.tax_id:
+            raise ValidationError({'tax_id': 'El CUIT/CUIL es requerido para esta condición de IVA.'})
+        # Asegurarse que si es Consumidor Final, no tenga CUIT/CUIL (o manejarlo según reglas AFIP)
+        # if self.tax_condition == 'CF' and self.tax_id:
+        #     raise ValidationError({'tax_id': 'Un Consumidor Final no debería tener CUIT/CUIL asociado.'})
+        pass # Puedes añadir más validaciones
 
 class Sale(models.Model):
     PAYMENT_METHOD_CHOICES = [
