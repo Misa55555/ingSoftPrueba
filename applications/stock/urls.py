@@ -4,5 +4,5 @@ from . import views
 
 
 urlpatterns = [
-    path('productos/', views.vista_stock, name ='stock')
+    path('/', views.vista_stock, name ='stock')
 ]
