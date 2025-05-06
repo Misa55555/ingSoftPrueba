@@ -18,3 +18,9 @@ ERROR-3
 Se rompio todo el codigo y no encuentro los errores al aplicar el descuento (no inicializa y no deja hacer las migraciones)
 (PROBLEMAS DE IDENTACION) ---> se soluciono 
 
+
+A TENER EN CUENTA-1
+opening_time = models.DateTimeField(verbose_name="Fecha y Hora de Apertura del Período")
+* con respecto a esa linea de codigo dentro de closures/models.py se esta usando timezone.now para realizar pruebas, pero mas adelante
+deberemos de cambiarla o modificarla correctamente asi mantenemos en condiciones la seguridad del proyecto en caso que vendamos el sistema
+de forma mensual y otras cosas que podrian afectar

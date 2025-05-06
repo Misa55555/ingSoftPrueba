@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+    .table-container { max-width: 1000px; margin: 20px auto; }
+    .table thead th { background-color: #f8f9fa; }
+    .table td, .table th { vertical-align: middle; }
+    .table-actions a { margin-right: 5px; }
+    /* Estilos para Bootstrap (si los usas en base.html) */
+    /* Si no, define estilos básicos para la tabla */
+    .table { width: 100%; margin-bottom: 1rem; color: #212529; border-collapse: collapse; }
+    .table th, .table td { padding: .75rem; border-top: 1px solid #dee2e6; }
+    .table thead th { border-bottom: 2px solid #dee2e6; }
+    .btn-sm { padding: .25rem .5rem; font-size: .875rem; line-height: 1.5; border-radius: .2rem; }
+    .btn-info { color: #fff; background-color: #17a2b8; border-color: #17a2b8; }
+    .btn-primary { color: #fff; background-color: #007bff; border-color: #007bff;}
+</style>
+
+<div class="table-container">
+    <h2><i class="fas fa-history"></i> {{ title }}</h2>
+    <hr>
+    <div class="mb-3 text-right">
+        <a href="{% url 'closures:perform_closure' %}" class="btn btn-primary">
+            <i class="fas fa-plus-circle"></i> Realizar Nuevo Cierre
+        </a>
+    </div>
+
+    {% if closures %}
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>ID Cierre</th>
+                <th>Apertura Período</th>
+                <th>Cierre Período</th>
+                <th>Usuario</th>
+                <th>Total Ventas</th>
+                <th>Efectivo Esperado</th>
+                <th>Efectivo Contado</th>
+                <th>Diferencia</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for closure in closures %}
+            <tr>
+                <td>#{{ closure.id }}</td>
+                <td>{{ closure.opening_time|date:"d/m/Y H:i" }}</td>
+                <td>{{ closure.closing_time|date:"d/m/Y H:i" }}</td>
+                <td>{{ closure.user.username|default:"N/A" }}</td>
+                <td>${{ closure.grand_total_sales|floatformat:2|intcomma }}</td>
+                <td>${{ closure.expected_cash|floatformat:2|intcomma }}</td>
+                <td>${{ closure.counted_cash|floatformat:2|intcomma }}</td>
+                <td class="{% if closure.cash_difference < 0 %}text-danger{% elif closure.cash_difference > 0 %}text-success{% else %}text-dark{% endif %}">
+                    ${{ closure.cash_difference|floatformat:2|intcomma }}
+                </td>
+                <td>
+                    <a href="{% url 'closures:closure_detail' closure.id %}" class="btn btn-info btn-sm" title="Ver Detalle">
+                        <i class="fas fa-eye"></i> Detalle
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-center">No hay cierres de caja registrados todavía.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -21,4 +21,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('stock/', include('applications.stock.urls', namespace='stock')),
     path('sales/', include('applications.sales.urls', namespace='sales')),
+    path('closures/', include('applications.closures.urls', namespace='closures')),
+    # ... Path para la vista Home/Dashboard (a crear después)
+    # path('', include('applications.dashboard.urls'), name='dashboard_home'),
 ]

@@ -37,7 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
     #local
     'applications.stock',
-    'applications.sales',    
+    'applications.sales',
+    'applications.closures',    
 ]
 
 MIDDLEWARE = [

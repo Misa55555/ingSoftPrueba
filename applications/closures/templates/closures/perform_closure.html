@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% load humanize %} {# Para formatos de números #}
+
+{% block title %}{{ title|default:"Cierre de Caja" }}{% endblock %}
+
+{% block content %}
+<style>
+    .closure-container { max-width: 800px; margin: 20px auto; }
+    .summary-cards { display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
+    .summary-card {
+        background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: .25rem;
+        padding: 1.25rem; flex: 1; min-width: 200px; text-align: center;
+    }
+    .summary-card h5 { font-size: 1rem; color: #6c757d; margin-bottom: .5rem; text-transform: uppercase;}
+    .summary-card .amount { font-size: 1.75rem; font-weight: bold; color: #343a40; }
+    .summary-card .count { font-size: 1rem; color: #495057; }
+
+    .closure-form-section { background-color: #fff; border: 1px solid #dee2e6; border-radius: .25rem; padding: 2rem; }
+    .form-group { margin-bottom: 1.5rem; }
+    .form-group label { display: block; font-weight: bold; margin-bottom: .5rem; }
+    .form-control {
+        display: block; width: 100%; padding: .375rem .75rem; font-size: 1rem;
+        line-height: 1.5; color: #495057; background-color: #fff;
+        background-clip: padding-box; border: 1px solid #ced4da;
+        border-radius: .25rem; transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+    }
+    .form-control:focus { border-color: #80bdff; outline: 0; box-shadow: 0 0 0 .2rem rgba(0,123,255,.25); }
+    textarea.form-control { min-height: 80px; }
+    .btn-submit-closure {
+        color: #fff; background-color: #28a745; border-color: #28a745;
+        padding: .5rem 1rem; font-size: 1.25rem; line-height: 1.5; border-radius: .3rem;
+        cursor: pointer; display: inline-block; font-weight: 400; text-align: center;
+        vertical-align: middle; user-select: none; border: 1px solid transparent;
+    }
+    .btn-submit-closure:hover { background-color: #218838; border-color: #1e7e34; }
+    .calculated-value { font-weight: bold; font-size: 1.1em; }
+    .difference-display { margin-top: 1rem; padding: 1rem; border-radius: .25rem; }
+    .difference-display.positive { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;}
+    .difference-display.negative { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;}
+    .difference-display.zero { background-color: #e2e3e5; color: #383d41; border: 1px solid #d6d8db;}
+
+    /* Mensajes de Django (copiar de otra plantilla si es necesario) */
+    .messages { list-style: none; padding: 0; margin-bottom: 15px; }
+    .messages li { padding: 10px 15px; margin-bottom: 10px; border-radius: 4px; }
+    .messages li.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .messages li.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;}
+
+    .period-info { text-align: center; margin-bottom: 20px; font-style: italic; color: #555; }
+</style>
+
+<div class="closure-container">
+    <h2><i class="fas fa-calculator"></i> {{ title }}</h2>
+    <p class="period-info">
+        Período del Cierre: Desde <strong>{{ start_of_period|date:"d/m/Y H:i:s" }}</strong> hasta <strong>{{ end_of_period|date:"d/m/Y H:i:s" }}</strong>
+    </p>
+    <hr>
+
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <h4>Resumen de Ventas del Período (Sistema)</h4>
+    <div class="summary-cards">
+        <div class="summary-card">
+            <h5>Efectivo Esperado</h5>
+            <p class="amount">${{ expected_cash|floatformat:2|intcomma }}</p>
+        </div>
+        <div class="summary-card">
+            <h5>Total Tarjetas</h5>
+            <p class="amount">${{ total_card|floatformat:2|intcomma }}</p>
+        </div>
+        <div class="summary-card">
+            <h5>Total Transferencias</h5>
+            <p class="amount">${{ total_transfer|floatformat:2|intcomma }}</p>
+        </div>
+        <div class="summary-card">
+            <h5>Ventas Totales (Monto)</h5>
+            <p class="amount">${{ grand_total_sales|floatformat:2|intcomma }}</p>
+        </div>
+        <div class="summary-card">
+            <h5>Cantidad de Ventas</h5>
+            <p class="amount">{{ total_sales_count }}</p>
+        </div>
+    </div>
+
+    <div class="closure-form-section">
+        <h4>Formulario de Cierre</h4>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="{{ form.counted_cash.id_for_label }}">{{ form.counted_cash.label }}</label>
+                {{ form.counted_cash }}
+                {% if form.counted_cash.errors %}
+                    <div class="invalid-feedback" style="display: block; color: red; font-size: 0.875em;">
+                        {% for error in form.counted_cash.errors %}{{ error }}{% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            {# Mostrar diferencia con JS o después del POST si se recarga con error #}
+            <div class="form-group">
+                <label>Efectivo Esperado (Sistema):</label>
+                <span class="calculated-value" id="expected-cash-display">${{ expected_cash|floatformat:2|intcomma }}</span>
+            </div>
+            <div class="form-group">
+                <label>Diferencia de Efectivo:</label>
+                <span class="calculated-value" id="cash-difference-display">$0.00</span>
+            </div>
+            <div id="difference-visual-feedback" class="difference-display" style="display: none;"></div>
+
+
+            <div class="form-group">
+                <label for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}
+                     <div class="invalid-feedback" style="display: block; color: red; font-size: 0.875em;">
+                        {% for error in form.notes.errors %}{{ error }}{% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn-submit-closure">
+                <i class="fas fa-check-circle"></i> Realizar Cierre de Caja
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const countedCashInput = document.getElementById('{{ form.counted_cash.id_for_label }}'); // Usar ID del form
+    const expectedCashDisplay = document.getElementById('expected-cash-display');
+    const cashDifferenceDisplay = document.getElementById('cash-difference-display');
+    const differenceVisualFeedback = document.getElementById('difference-visual-feedback');
+
+    // Obtener el valor de expected_cash (puede necesitar parseo si tiene comas por intcomma)
+    // Es más seguro pasar este valor desde el contexto o un data-attribute si hay formatos complejos.
+    // Por ahora, intentamos leerlo del span, asumiendo formato simple o que JS lo maneje.
+    let expectedCashValue = 0;
+    if (expectedCashDisplay) {
+        // Quitar '$' y comas, luego convertir a float
+        let textValue = expectedCashDisplay.textContent.replace('$', '').replace(/,/g, '');
+        expectedCashValue = parseFloat(textValue) || 0;
+    }
+
+
+    function updateCashDifference() {
+        if (!countedCashInput || !cashDifferenceDisplay) return;
+
+        const countedCash = parseFloat(countedCashInput.value) || 0;
+        const difference = countedCash - expectedCashValue;
+
+        cashDifferenceDisplay.textContent = '$' + difference.toFixed(2);
+
+        // Feedback visual para la diferencia
+        if (differenceVisualFeedback) {
+            differenceVisualFeedback.style.display = 'block';
+            differenceVisualFeedback.textContent = 'Diferencia: $' + difference.toFixed(2);
+            if (difference > 0) {
+                differenceVisualFeedback.className = 'difference-display positive';
+                differenceVisualFeedback.textContent += ' (Sobrante)';
+            } else if (difference < 0) {
+                differenceVisualFeedback.className = 'difference-display negative';
+                differenceVisualFeedback.textContent += ' (Faltante)';
+            } else {
+                differenceVisualFeedback.className = 'difference-display zero';
+                differenceVisualFeedback.textContent += ' (Cuadra Perfecto)';
+            }
+        }
+    }
+
+    if (countedCashInput) {
+        countedCashInput.addEventListener('input', updateCashDifference);
+        // Calcular diferencia inicial si el campo tiene un valor (ej. si hay un error de form y se recarga)
+        if (countedCashInput.value) {
+            updateCashDifference();
+        }
+    }
+});
+</script>
+{# Necesitarás FontAwesome si usas los iconos #}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+{% endblock %}

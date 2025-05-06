@@ -1,0 +1,130 @@
+{% extends 'base.html' %} {# O usa una base_receipt.html si tienes una para impresión limpia #}
+{% load humanize %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+    /* Reutiliza o adapta estilos de receipt.html para la sección de impresión */
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #fff; }
+    .receipt-print-area { max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #ccc; }
+    .receipt-header { text-align: center; margin-bottom: 20px; }
+    .receipt-header h3 { margin: 0; }
+    .receipt-section { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #eee; }
+    .receipt-section:last-child { border-bottom: none; }
+    .receipt-section h4 { margin-top: 0; margin-bottom: 10px; font-size: 1.1em; color: #333; }
+    .receipt-details p, .sales-list li { margin: 5px 0; font-size: 0.95em; }
+    .receipt-details strong { min-width: 180px; display: inline-block; }
+    .totals-summary strong { min-width: 150px; }
+    .sales-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
+    .sales-table th, .sales-table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+    .sales-table th { background-color: #f2f2f2; }
+    .amount-col { text-align: right; }
+    .print-button-container { text-align: center; margin-top: 30px; }
+    .print-button {
+        padding: 10px 20px; background-color: #007bff; color: white;
+        border: none; border-radius: 5px; cursor: pointer; text-decoration: none; font-size: 1em;
+    }
+    .back-link { display: block; text-align: center; margin-top:10px; }
+
+
+    @media print {
+        body { margin: 1cm; padding: 0; font-size: 10pt;}
+        .receipt-print-area { max-width: 100%; border: none; margin: 0; padding: 0; box-shadow: none; }
+        .print-button-container, .back-link, .navbar, footer { /* Oculta elementos no necesarios de tu base.html */
+            display: none !important;
+        }
+        .receipt-section { page-break-inside: avoid; } /* Intenta evitar cortes dentro de secciones */
+    }
+</style>
+
+<div class="receipt-print-area">
+    <div class="receipt-header">
+        <h3>{{ company_name }}</h3>
+        <p>{{ company_address }} - Tel: {{ company_phone }}</p>
+        <h2>{{ title }}</h2>
+    </div>
+
+    <div class="receipt-section">
+        <h4>Información del Cierre</h4>
+        <div class="receipt-details">
+            <p><strong>ID Cierre:</strong> #{{ closure.id }}</p>
+            <p><strong>Usuario:</strong> {{ closure.user.username|default:"N/A" }}</p>
+            <p><strong>Apertura Período:</strong> {{ closure.opening_time|date:"d/m/Y H:i:s" }}</p>
+            <p><strong>Cierre Período:</strong> {{ closure.closing_time|date:"d/m/Y H:i:s" }}</p>
+        </div>
+    </div>
+
+    <div class="receipt-section">
+        <h4>Resumen de Totales</h4>
+        <div class="receipt-details totals-summary">
+            <p><strong>Cantidad de Ventas:</strong> {{ closure.total_sales_count }}</p>
+            <p><strong>Total General Ventas (Sistema):</strong> ${{ closure.grand_total_sales|floatformat:2|intcomma }}</p>
+            <hr style="border-style: dotted;">
+            <p><strong>Efectivo Esperado (Sistema):</strong> ${{ closure.expected_cash|floatformat:2|intcomma }}</p>
+            <p><strong>Efectivo Contado:</strong> ${{ closure.counted_cash|floatformat:2|intcomma }}</p>
+            <p class="{% if closure.cash_difference < 0 %}text-danger{% elif closure.cash_difference > 0 %}text-success{% else %}text-dark{% endif %}">
+                <strong>Diferencia de Efectivo:</strong> ${{ closure.cash_difference|floatformat:2|intcomma }}
+                {% if closure.cash_difference < 0 %} (Faltante)
+                {% elif closure.cash_difference > 0 %} (Sobrante)
+                {% else %} (Cuadra Perfecto)
+                {% endif %} 
+            </p>
+            <hr style="border-style: dotted;">
+            <p><strong>Total Ventas Tarjeta:</strong> ${{ closure.total_card_sales|floatformat:2|intcomma }}</p>
+            <p><strong>Total Ventas Transferencia:</strong> ${{ closure.total_transfer_sales|floatformat:2|intcomma }}</p>
+        </div>
+    </div>
+
+    {% if closure.notes %}
+    <div class="receipt-section">
+        <h4>Notas del Cierre</h4>
+        <p style="white-space: pre-wrap;">{{ closure.notes }}</p>
+    </div>
+    {% endif %}
+
+    <div class="receipt-section">
+        <h4>Detalle de Ventas en este Período</h4>
+        {% if sales_in_period %}
+        <table class="sales-table">
+            <thead>
+                <tr>
+                    <th>ID Venta</th>
+                    <th>Fecha/Hora</th>
+                    <th>Cliente</th>
+                    <th>Vendedor</th>
+                    <th>Método Pago</th>
+                    <th>Descuento</th>
+                    <th class="amount-col">Total Venta</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in sales_in_period %}
+                <tr>
+                    <td><a href="{% url 'sales:sale_receipt' sale.id %}" target="_blank">#{{ sale.id }}</a></td>
+                    <td>{{ sale.sale_date|date:"d/m H:i" }}</td>
+                    <td>{{ sale.client.client_name|default:"Cons. Final" }}</td>
+                    <td>{{ sale.seller.username|default:"N/A" }}</td>
+                    <td>{{ sale.get_payment_method_display }}</td>
+                    <td>${{ sale.discount_amount|floatformat:2 }}</td>
+                    <td class="amount-col">${{ sale.total_amount|floatformat:2|intcomma }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No se registraron ventas en este período.</p>
+        {% endif %}
+    </div>
+
+</div> {# Fin receipt-print-area #}
+
+<div class="print-button-container">
+    <button onclick="window.print();" class="print-button"><i class="fas fa-print"></i> Imprimir Detalle de Cierre</button>
+</div>
+<p class="back-link"><a href="{% url 'closures:closure_history' %}">&laquo; Volver al Historial de Cierres</a></p>
+
+{# FontAwesome para iconos #}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+
+{% endblock %}
