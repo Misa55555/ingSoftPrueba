@@ -77,6 +77,7 @@
     .cash-fields input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
     #change_display { font-weight: bold; font-size: 1.1em; color: #28a745; }
 
+    #discount-error { color: red; font-size: 0.9em; display: none; margin-top: 5px; }
 </style>
 
 
@@ -144,6 +145,19 @@
                         {% endwith %}
                     </div>
 
+                    <div class="form-section">
+                        <h4><i class="fas fa-tags"></i> Descuentos Adicionales</h4>
+                         <div class="form-group">
+                             <label for="discount_amount">Monto Descuento ($)</label>
+                             <input type="number" name="discount_amount" id="discount_amount" step="0.01" min="0" value="{{ discount_amount|default:'0.00' }}" class="form-control">
+                              <small id="discount-error">El descuento no puede ser mayor que el subtotal.</small>
+                         </div>
+                         <div class="form-group">
+                            <label for="discount_reason">Razón del Descuento (Opcional)</label>
+                            <input type="text" name="discount_reason" id="discount_reason" value="{{ discount_reason|default:'' }}" class="form-control" maxlength="255">
+                        </div>
+                    </div>
+
                     <div class="cash-fields" id="cash-fields-container">
                         <div class="form-group">
                             <label for="amount_received">Efectivo Recibido:</label>
@@ -187,7 +201,8 @@
              </div>
              <div class="summary-totals">
                  <p>Subtotal: <span>${{ cart_total|floatformat:2 }}</span></p>
-                 <p class="total" id="total-amount" data-total="{{ cart_total|stringformat:'.2f' }}">Total a Pagar: <span>${{ cart_total|floatformat:2 }}</span></p> {# Añadido ID y data-total para JS #}
+                 <p>Descuento: <span id="summary-discount">-$0.00</span></p>
+                 <p class="total" id="total-amount" data-subtotal="{{ cart_total|stringformat:'.2f' }}">Total a Pagar: <span id="summary-total">${{ cart_total|floatformat:2 }}</span></p> {# El total se recalcula con JS #}
              </div>
         </div>
     </div>
@@ -197,59 +212,169 @@
 
 {% block extra_scripts %} {# Bloque para añadir JS al final del body #}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+// applications/sales/templates/sales/checkout.html (dentro de <script>)
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // --- Selectores ---
     const paymentMethodRadios = document.querySelectorAll('input[name="payment_method"]');
     const cashFieldsContainer = document.getElementById('cash-fields-container');
     const amountReceivedInput = document.getElementById('amount_received');
     const changeDisplay = document.getElementById('change_display');
-    const totalAmountElement = document.getElementById('total-amount');
+    const totalAmountElement = document.getElementById('total-amount'); // El <p> que contiene data-subtotal y el span del total final
     const cashErrorMsg = document.getElementById('cash-error');
-    const checkoutForm = document.getElementById('checkout-form'); // Formulario principal
+    const checkoutForm = document.getElementById('checkout-form');
+    const discountInput = document.getElementById('discount_amount');
+    const discountErrorMsg = document.getElementById('discount-error');
+    const summaryDiscountDisplay = document.getElementById('summary-discount');
+    const summaryTotalDisplay = document.getElementById('summary-total'); // El <span> para el total final
 
-    // Obtener el monto total del atributo data-* o directamente si es seguro
-    const totalAmount = parseFloat(totalAmountElement.dataset.total || '0');
+    // --- Obtener Subtotal (Base para cálculos) ---
+    const subtotal = parseFloat(totalAmountElement.dataset.subtotal || '0'); // Total ANTES de descuento
 
+    // --- Funciones ---
     function toggleCashFields() {
         const selectedMethod = document.querySelector('input[name="payment_method"]:checked').value;
         if (selectedMethod === 'cash') {
             cashFieldsContainer.classList.add('visible');
-            amountReceivedInput.required = true; // Hacer requerido si es efectivo
-             calculateChange(); // Calcular cambio al mostrar
+            amountReceivedInput.required = true;
+             // Calcular cambio inicial al seleccionar efectivo
+             // Necesitamos el total final actual
+             const currentDiscount = parseFloat(discountInput.value || '0');
+             const validDiscount = (currentDiscount >= 0 && currentDiscount <= subtotal) ? currentDiscount : 0;
+             const currentFinalTotal = subtotal - validDiscount;
+             calculateChange(currentFinalTotal); // Pasar el total final
         } else {
             cashFieldsContainer.classList.remove('visible');
-            amountReceivedInput.required = false; // No requerido si no es efectivo
-            amountReceivedInput.value = ''; // Limpiar campo al ocultar
-            changeDisplay.textContent = '$0.00'; // Resetear cambio
-            cashErrorMsg.style.display = 'none'; // Ocultar error
+            amountReceivedInput.required = false;
+            amountReceivedInput.value = '';
+            changeDisplay.textContent = '$0.00';
+            cashErrorMsg.style.display = 'none';
         }
+        // No es necesario llamar a updateTotalDisplay aquí normalmente,
+        // a menos que el método de pago afectara el descuento (no es el caso).
     }
 
-    function calculateChange() {
-        const amountReceived = parseFloat(amountReceivedInput.value || '0');
-        let change = 0.00;
-        let error = false;
+    // >>> Renombrado parámetro a finalTotal para claridad <<<
+    function calculateChange(finalTotal) {
+         const amountReceived = parseFloat(amountReceivedInput.value || '0');
+         let change = 0.00;
+         let error = false;
 
-        if (amountReceived >= totalAmount) {
-            change = amountReceived - totalAmount;
-            cashErrorMsg.style.display = 'none';
-            error = false;
-        } else if (amountReceived > 0 && amountReceived < totalAmount) {
-             // Mostrar error si se ingresó algo pero es insuficiente
+         // La lógica aquí es correcta, compara amountReceived con finalTotal
+         if (amountReceived >= finalTotal) {
+             change = amountReceived - finalTotal;
+             cashErrorMsg.style.display = 'none';
+             error = false;
+         } else if (amountReceived > 0 && amountReceived < finalTotal) {
              cashErrorMsg.style.display = 'block';
-             change = 0.00; // No mostrar cambio negativo
-             error = true; // Marcar error para posible validación en submit
-        }
-         else {
-            // Si el campo está vacío o es 0, no mostrar error aún, pero el cambio es 0
+             change = 0.00;
+             error = true;
+         } else {
              cashErrorMsg.style.display = 'none';
              change = 0.00;
-             error = false; // No es un error si está vacío, pero será inválido al enviar si es requerido
+             // Si el campo está vacío y es requerido, la validación del submit lo manejará
+             error = false;
+         }
+         changeDisplay.textContent = `$${change.toFixed(2)}`;
+         return !error; // Devuelve true si no hay error de monto insuficiente
+    }
+
+    function updateTotalDisplay() {
+        const discountAmount = parseFloat(discountInput.value || '0');
+        let calculatedFinalTotal = subtotal; // Empieza con el subtotal
+        let discountValid = true;
+
+        if (discountAmount < 0) {
+            discountErrorMsg.textContent = "El descuento no puede ser negativo.";
+            discountErrorMsg.style.display = 'block';
+            discountValid = false;
+            calculatedFinalTotal = subtotal; // Si hay error, el total vuelve a ser el subtotal
+        } else if (discountAmount > subtotal) {
+            discountErrorMsg.textContent = "El descuento no puede ser mayor que el subtotal.";
+            discountErrorMsg.style.display = 'block';
+            discountValid = false;
+            calculatedFinalTotal = 0; // El total no puede ser negativo
+        } else {
+            // Descuento válido
+            discountErrorMsg.style.display = 'none';
+            calculatedFinalTotal = subtotal - discountAmount; // Calcula el total final correcto
+            discountValid = true;
         }
 
-        // Formatear como moneda
-        changeDisplay.textContent = `$${change.toFixed(2)}`;
-        return !error; // Devuelve true si no hay error de monto insuficiente
+        // Actualizar Resumen Visual
+        summaryDiscountDisplay.textContent = `-$${discountAmount.toFixed(2)}`;
+        summaryTotalDisplay.textContent = `$${calculatedFinalTotal.toFixed(2)}`; // Muestra el total calculado
+
+        // Si el método de pago es efectivo, recalcular el cambio usando el nuevo total final
+        const selectedMethod = document.querySelector('input[name="payment_method"]:checked').value;
+        if (selectedMethod === 'cash') {
+            // >>> Pasar calculatedFinalTotal a calculateChange <<<
+            calculateChange(calculatedFinalTotal);
+        }
+        return discountValid; // Devuelve si el descuento es válido
     }
+
+
+    // --- Event Listeners (Sin cambios funcionales, solo nombres de variables) ---
+    paymentMethodRadios.forEach(radio => {
+        radio.addEventListener('change', toggleCashFields);
+    });
+
+    if (amountReceivedInput) {
+         amountReceivedInput.addEventListener('input', () => {
+             // Obtiene el total final actual y lo pasa a calculateChange
+             const currentDiscount = parseFloat(discountInput.value || '0');
+             const validDiscount = (currentDiscount >= 0 && currentDiscount <= subtotal) ? currentDiscount : 0;
+             const currentFinalTotal = subtotal - validDiscount;
+             calculateChange(currentFinalTotal); // Pasar el total final correcto
+         });
+    }
+
+     if (discountInput) {
+         discountInput.addEventListener('input', updateTotalDisplay);
+     }
+
+     // --- Validación Opcional al Enviar (Usa los totales recalculados) ---
+     if (checkoutForm) {
+         checkoutForm.addEventListener('submit', function(event) {
+             // 1. Validar descuento (llama a updateTotalDisplay que recalcula todo)
+             if (!updateTotalDisplay()) {
+                 event.preventDefault();
+                 alert("Error: El monto del descuento es inválido.");
+                 discountInput.focus();
+                 return;
+             }
+
+             // 2. Validar efectivo (si aplica) usando el total recalculado
+             const selectedMethod = document.querySelector('input[name="payment_method"]:checked').value;
+             if (selectedMethod === 'cash') {
+                  // Recalcular el finalTotal por si acaso justo antes de validar
+                  const currentDiscount = parseFloat(discountInput.value || '0');
+                  const validDiscount = (currentDiscount >= 0 && currentDiscount <= subtotal) ? currentDiscount : 0;
+                  const currentFinalTotal = subtotal - validDiscount;
+
+                 if (!amountReceivedInput.value || parseFloat(amountReceivedInput.value || '0') <= 0) {
+                     event.preventDefault();
+                     alert("Error: Debe ingresar el monto recibido en efectivo.");
+                     amountReceivedInput.focus();
+                     return;
+                 }
+                 // Llama a calculateChange para validación final
+                 if (!calculateChange(currentFinalTotal)) {
+                     event.preventDefault();
+                     alert("Error: El efectivo recibido debe ser mayor o igual al total a pagar.");
+                     amountReceivedInput.focus();
+                     return;
+                 }
+             }
+         });
+     }
+
+    // Llamadas iniciales al cargar
+    toggleCashFields(); // Asegura que los campos de efectivo se muestren/oculten bien
+    updateTotalDisplay(); // Calcula y muestra el total inicial correcto (considerando descuento si hay)
+
+});
 
     // Mostrar/ocultar campos al cambiar método de pago
     paymentMethodRadios.forEach(radio => {
@@ -285,6 +410,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Llamada inicial para establecer el estado correcto al cargar la página
     toggleCashFields();
 
-});
+
 </script>
 {% endblock %}

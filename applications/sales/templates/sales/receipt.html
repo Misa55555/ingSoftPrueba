@@ -104,20 +104,24 @@
 
         <section class="totals">
             {# Mostrar subtotal si es diferente del total (ej. por descuentos futuros) #}
-            {# <p>Subtotal: <span>${{ subtotal_placeholder|floatformat:2 }}</span></p> #}
-            {# <p>Descuento: <span>-${{ sale.discount_amount|floatformat:2 }}</span></p> #}
+            <p>Subtotal: <span>${{ sale.subtotal|floatformat:2 }}</span></p>
+            {# Mostrar Descuento si es mayor que cero #}
+            {% if sale.discount_amount > 0 %}
+            <p>Descuento {% if sale.discount_reason %}({{ sale.discount_reason }}){% endif %}: <span>-${{ sale.discount_amount|floatformat:2 }}</span></p>
+            {% endif %}
+            {# Mostrar Total Final (el que está guardado en total_amount) #}
             <p>TOTAL: <span>${{ sale.total_amount|floatformat:2 }}</span></p>
         </section>
 
         <section class="payment-info">
-             <p>----------------------------------------</p>
-             <p><strong>Forma de Pago:</strong> {{ sale.get_payment_method_display }}</p> {# Muestra el valor legible #}
-             {% if sale.payment_method == 'cash' and sale.amount_received is not None %}
-                 <p>Recibido: ${{ sale.amount_received|floatformat:2 }}</p>
-                 <p>Cambio: ${{ sale.change_given|floatformat:2 }}</p>
-             {% endif %}
-             {# Aquí mostraríamos detalles de tarjeta/transferencia si los guardamos #}
-        </section>
+            {# ... (Info de pago igual que antes, basada en sale.total_amount) ... #}
+            <p>----------------------------------------</p>
+            <p><strong>Forma de Pago:</strong> {{ sale.get_payment_method_display }}</p>
+            {% if sale.payment_method == 'cash' and sale.amount_received is not None %}
+                <p>Recibido: ${{ sale.amount_received|floatformat:2 }}</p>
+                <p>Cambio: ${{ sale.change_given|floatformat:2 }}</p>
+            {% endif %}
+       </section>
 
         {% if sale.notes %}
         <section class="notes">

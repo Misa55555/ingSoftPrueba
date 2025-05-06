@@ -69,70 +69,105 @@ class Sale(models.Model):
         ('cash', 'Efectivo'),
         ('card', 'Tarjeta'),
         ('transfer', 'Transferencia'),
-        # ('mixed', 'Mixto'), # Podríamos añadir mixto más adelante
     ]
 
-    # id_sale es automático (id)
+    # --- Campos Principales ---
     client = models.ForeignKey(
         Client,
-        on_delete=models.SET_NULL, # Si se borra el cliente, la venta queda registrada sin cliente
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        verbose_name="Cliente",
-        
+        verbose_name="Cliente"
     )
     seller = models.ForeignKey(
-        settings.AUTH_USER_MODEL, # Vincula al modelo User de Django (o tu custom user)
-        on_delete=models.SET_NULL, # Si se borra el vendedor, la venta queda sin vendedor asignado
-        null=True, # Permite nulo por si acaso, aunque idealmente siempre habrá un user logueado
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
         verbose_name="Vendedor"
     )
     sale_date = models.DateTimeField(default=timezone.now, verbose_name="Fecha de Venta")
-    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, verbose_name="Monto Total")
+
+    # --- Campos de Montos ---
+    # total_amount almacena el MONTO FINAL (después de descuentos)
+    total_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'),
+        verbose_name="Monto Total (Final)"
+    )
+    discount_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        verbose_name="Monto Descuento"
+    )
+
+    # --- Campos de Pago ---
     payment_method = models.CharField(
         max_length=20,
         choices=PAYMENT_METHOD_CHOICES,
-        default='cash', # Establecer efectivo como predeterminado
+        default='cash',
         verbose_name="Método de Pago"
     )
-    # Campos específicos para pago en efectivo
-    amount_received = models.DecimalField(
+    amount_received = models.DecimalField( # Específico para efectivo
         max_digits=12, decimal_places=2, null=True, blank=True,
         verbose_name="Monto Recibido (Efectivo)"
     )
-    change_given = models.DecimalField(
+    change_given = models.DecimalField( # Específico para efectivo
         max_digits=12, decimal_places=2, null=True, blank=True,
         verbose_name="Cambio Entregado (Efectivo)"
     )
+
+    # --- Campos Adicionales ---
+    discount_reason = models.CharField(
+        max_length=255, blank=True, null=True,
+        verbose_name="Razón Descuento"
+    )
     notes = models.TextField(blank=True, null=True, verbose_name="Notas Adicionales")
 
+    # --- Meta Clase (sin cambios) ---
     class Meta:
         verbose_name = "Venta"
         verbose_name_plural = "Ventas"
         ordering = ['-sale_date']
 
-    # Limpieza/Validación a nivel de modelo
-    def clean(self):
-        if self.payment_method == 'cash':
-            if self.amount_received is None:
-                raise ValidationError("Para pagos en efectivo, se requiere el monto recibido.")
-            if self.amount_received < self.total_amount:
-                raise ValidationError("El monto recibido en efectivo no puede ser menor al total.")
-        # Podrías añadir más validaciones aquí
-        pass
+    # --- Propiedad Subtotal (sin cambios) ---
+    @property
+    def subtotal(self):
+        if self.total_amount is not None and self.discount_amount is not None:
+             # El subtotal es el total final MÁS el descuento que se aplicó
+             return self.total_amount + self.discount_amount
+        return self.total_amount # Fallback
 
-    def save(self, *args, **kwargs):
-        # Calcular cambio si es efectivo y aún no se ha calculado
-        if self.payment_method == 'cash' and self.amount_received is not None and self.change_given is None:
-             self.change_given = self.amount_received - self.total_amount
-             # Asegurarse que el cambio no sea negativo (aunque clean() debería prevenirlo)
-             if self.change_given < 0: self.change_given = Decimal('0.00')
-
-        super().save(*args, **kwargs) # Llamar al método save original
-
+    # --- Método __str__ (Corregido indentación) ---
     def __str__(self):
         client_name = self.client.client_name if self.client else "Consumidor Final"
         return f"Venta #{self.id} - {client_name} - {self.sale_date.strftime('%Y-%m-%d %H:%M')}"
+
+    # --- Método clean (Corregido indentación y validación) ---
+    def clean(self):
+        # Validación de Descuento (más simple y segura aquí)
+        if self.discount_amount < 0:
+            raise ValidationError({'discount_amount': 'El descuento no puede ser negativo.'})
+
+        # Es difícil validar aquí que el descuento no exceda el subtotal,
+        # porque el subtotal no está guardado directamente.
+        # Es mejor validar esto en la VISTA antes de guardar.
+
+        # También es mejor validar la suficiencia del monto recibido en la VISTA.
+        # Aquí podríamos validar que si hay cambio, no sea negativo.
+        if self.change_given is not None and self.change_given < 0:
+             raise ValidationError({'change_given': 'El cambio no puede ser negativo.'})
+
+    # --- Método save (Corregido indentación, quitado cálculo de cambio) ---
+    def save(self, *args, **kwargs):
+        # Quitamos el cálculo automático de 'change_given'.
+        # Este cálculo es más seguro hacerlo en la vista 'checkout_view'
+        # ANTES de crear el objeto Sale, porque allí tenemos acceso fácil
+        # al subtotal, descuento y monto recibido validados.
+        super().save(*args, **kwargs) # Llamar al método save original
+
+        #tengo que ver si añadir esto
+        # def __str__(self):  
+        #     client_name = self.client.client_name if self.client else "Consumidor Final"
+        #     return f"Venta #{self.id} - {client_name} - {self.sale_date.strftime('%Y-%m-%d %H:%M')}"
+        #     super().save(*args, **kwargs)
     
 
 class SaleDetail(models.Model):

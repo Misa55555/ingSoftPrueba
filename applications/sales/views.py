@@ -207,156 +207,173 @@ def checkout_view(request):
         messages.warning(request, "Tu carrito está vacío.")
         return redirect('sales:pos_view')
 
-    cart_total = calculate_cart_total(cart)
-    clients = Client.objects.all()
-    payment_choices = Sale.PAYMENT_METHOD_CHOICES # Pasar choices a la plantilla
-
-    # --- Leer posible cliente nuevo de la URL ---
+    # --- CALCULO INICIAL ---
+    # cart_subtotal SIEMPRE representa el total ANTES de descuentos
+    cart_subtotal = calculate_cart_total(cart)
+    clients = Client.objects.all().order_by('client_name')
+    payment_choices = Sale.PAYMENT_METHOD_CHOICES
     new_client_id_from_url = request.GET.get('new_client_id')
 
     if request.method == 'POST':
+        # --- OBTENER DATOS DEL POST ---
         client_id = request.POST.get('client_id')
         payment_method = request.POST.get('payment_method')
-        notes = request.POST.get('notes', '') # Obtener notas
+        notes = request.POST.get('notes', '')
         amount_received_str = request.POST.get('amount_received')
+        discount_amount_str = request.POST.get('discount_amount', '0')
+        discount_reason = request.POST.get('discount_reason', '')
 
+        # --- INICIALIZAR VARIABLES ---
         selected_client = None
-        amount_received = None
-        change_given = None
+        amount_received = None # Será Decimal si es efectivo y válido
+        change_given = None    # Será Decimal si es efectivo y hay cambio
+        discount_amount = Decimal('0.00') # Será Decimal validado
+        final_total = cart_subtotal # Total a pagar empieza como subtotal
 
-        # --- Validación de Datos del Formulario (Antes de la transacción) ---
-        if client_id:
+        # --- BLOQUE try...except PARA VALIDACIONES PREVIAS ---
+        # Usamos un try/except general para las validaciones que redirigen
+        # al formulario con errores.
+        try:
+            # --- Validación de Cliente ---
+            if client_id:
+                try:
+                    selected_client = Client.objects.get(id=client_id)
+                except Client.DoesNotExist:
+                    messages.error(request, "Cliente seleccionado inválido.")
+                    raise ValidationError("Cliente inválido") # Para ir al render error
+
+            # --- Validación de Método de Pago ---
+            if not payment_method or payment_method not in [code for code, name in Sale.PAYMENT_METHOD_CHOICES]:
+                 messages.error(request, "Método de pago inválido.")
+                 raise ValidationError("Pago inválido")
+
+            # --- Validación y Cálculo de Descuento ---
             try:
-                selected_client = Client.objects.get(id=client_id)
-            except Client.DoesNotExist:
-                messages.error(request, "Cliente seleccionado inválido.")
-                # Volver a renderizar con error y datos previos
-                return render(request, 'sales/checkout.html', {
-                    'cart': cart,
-                    'cart_items': get_detailed_cart_items(cart),
-                    'cart_total': cart_total,
-                    'clients': clients,
-                    'payment_choices': payment_choices, # Reenviar choices
-                    'selected_client_id': client_id, # Mantener selección
-                    'selected_payment_method': payment_method, # Mantener selección
-                    'notes': notes, # Mantener notas
-                    'amount_received': amount_received_str, # Mantener monto
-                })
-
-        if not payment_method or payment_method not in [code for code, name in Sale.PAYMENT_METHOD_CHOICES]:
-             messages.error(request, "Método de pago inválido.")
-             # Volver a renderizar con error (similar a arriba)
-             # ... (código de renderizado de error omitido por brevedad) ...
-             return render(request, 'sales/checkout.html', { # ... contexto ...
-                 'selected_payment_method': payment_method, # Pasar el inválido para depuración si quieres
-              })
-
-
-        if payment_method == 'cash':
-            if not amount_received_str:
-                messages.error(request, "Debe ingresar el monto recibido para pago en efectivo.")
-                # Volver a renderizar con error
-                # ... (código de renderizado de error omitido) ...
-                return render(request, 'sales/checkout.html', { # ... contexto ...
-                     'selected_payment_method': payment_method,
-                })
-            try:
-                amount_received = Decimal(amount_received_str)
-                if amount_received < cart_total:
-                    messages.error(request, "El efectivo recibido debe ser mayor o igual al total.")
-                    # Volver a renderizar con error
-                    # ... (código de renderizado de error omitido) ...
-                    return render(request, 'sales/checkout.html', { # ... contexto ...
-                          'selected_payment_method': payment_method,
-                          'amount_received': amount_received_str,
-                    })
-                change_given = amount_received - cart_total
+                discount_amount = Decimal(discount_amount_str) if discount_amount_str else Decimal('0.00')
+                if discount_amount < 0:
+                    messages.error(request, "El descuento no puede ser negativo.")
+                    raise ValidationError("Descuento negativo")
+                if discount_amount > cart_subtotal:
+                     messages.error(request, "El descuento no puede ser mayor que el subtotal.")
+                     raise ValidationError("Descuento excede subtotal")
             except InvalidOperation:
-                messages.error(request, "Monto recibido inválido.")
-                # Volver a renderizar con error
-                # ... (código de renderizado de error omitido) ...
-                return render(request, 'sales/checkout.html', { # ... contexto ...
-                      'selected_payment_method': payment_method,
-                       'amount_received': amount_received_str,
-                 })
-        # --- Validación extra: Recalcular total desde base de datos ---
-            
+                messages.error(request, "Monto de descuento inválido.")
+                raise ValidationError("Descuento inválido")
 
-        # --- Si las validaciones pasan, proceder con la transacción ---
+            # --- Calcular Total Final ---
+            final_total = cart_subtotal - discount_amount # Total a pagar DESPUÉS de descuento
+
+            # --- Validación de Efectivo (si aplica) ---
+            if payment_method == 'cash':
+                if not amount_received_str:
+                    messages.error(request, "Debe ingresar el monto recibido para pago en efectivo.")
+                    raise ValidationError("Falta monto recibido")
+                try:
+                    amount_received = Decimal(amount_received_str)
+                    # >>> CORRECCIÓN IMPORTANTE: Comparar con final_total <<<
+                    if amount_received < final_total:
+                        messages.error(request, "El efectivo recibido debe ser mayor o igual al total a pagar (después del descuento).")
+                        raise ValidationError("Efectivo insuficiente")
+                    # >>> CORRECCIÓN IMPORTANTE: Calcular cambio aquí <<<
+                    change_given = amount_received - final_total
+                except InvalidOperation:
+                    messages.error(request, "Monto recibido inválido.")
+                    raise ValidationError("Monto recibido inválido")
+
+        # --- FIN BLOQUE try...except PARA VALIDACIONES ---
+        except ValidationError:
+             # Si alguna validación falló, renderizar de nuevo el formulario
+             return render(request, 'sales/checkout.html', {
+                 'cart': cart, 'cart_items': get_detailed_cart_items(cart),
+                 'cart_total': cart_subtotal, # Pasar subtotal
+                 'clients': clients, 'payment_choices': payment_choices,
+                 'selected_client_id': client_id, # Mantener selección
+                 'selected_payment_method': payment_method,
+                 'notes': notes, 'amount_received': amount_received_str, # Devolver strings originales
+                 'discount_amount': discount_amount_str,
+                 'discount_reason': discount_reason,
+             })
+
+        # --- Si TODAS las validaciones previas pasaron, proceder con la transacción ---
         try:
             with transaction.atomic():
-                # 1. Validar stock y bloquear (sin cambios aquí)
+                # 1. Validar stock y bloquear (igual que antes)
                 products_to_update = []
                 for product_id_str, item_data in cart.items():
-                    # ... (lógica de select_for_update y chequeo de stock igual que antes) ...
                      product_id = int(product_id_str)
                      quantity_to_sell = item_data['quantity']
-                     product = Product.objects.select_for_update().get(id=product_id)
+                     # Usar try-except por si el producto fue borrado mientras estaba en carrito
+                     try:
+                         product = Product.objects.select_for_update().get(id=product_id)
+                     except Product.DoesNotExist:
+                          raise ValueError(f"Producto ID {product_id} no encontrado. Elimínelo del carrito.")
+
                      if product.stock < quantity_to_sell:
                          raise ValueError(f"Stock insuficiente para '{product.name}'. Disponible: {product.stock}, Solicitado: {quantity_to_sell}")
-                     products_to_update.append({'product': product, 'quantity': quantity_to_sell})
+                     products_to_update.append({'product': product, 'quantity': quantity_to_sell, 'price': Decimal(item_data.get('price', '0.00'))}) # Guardar precio Decimal aquí también
 
-
-                # 2. Crear la Venta (Sale) con los nuevos campos
+                # 2. Crear la Venta (Sale) con todos los datos validados y calculados
                 sale = Sale.objects.create(
                     client=selected_client,
                     seller=request.user,
-                    total_amount=cart_total,
-                    payment_method=payment_method, # Guardar método
-                    amount_received=amount_received, # Guardar monto recibido (será None si no es cash)
-                    change_given=change_given,       # Guardar cambio (será None si no es cash)
-                    notes=notes                     # Guardar notas
+                    total_amount=final_total,        # <-- Total FINAL
+                    payment_method=payment_method,
+                    amount_received=amount_received, # <-- Monto recibido (Decimal o None)
+                    change_given=change_given,       # <-- Cambio calculado (Decimal o None)
+                    discount_amount=discount_amount, # <-- Descuento (Decimal)
+                    discount_reason=discount_reason,
+                    notes=notes
                 )
 
-                # 3. Crear Detalles y Actualizar Stock (sin cambios aquí)
+                # 3. Crear Detalles y Actualizar Stock
                 for item in products_to_update:
-                    # ... (lógica de crear SaleDetail y decrementar stock con F() igual que antes) ...
                     product = item['product']
                     quantity = item['quantity']
-                    unit_price = cart[str(product.id)]['price']
+                    unit_price = item['price'] # Usar el precio Decimal guardado
                     SaleDetail.objects.create(
                         sale=sale, product=product, quantity=quantity, unit_price=unit_price
                     )
+                    # Decrementar stock
                     product.stock = F('stock') - quantity
                     product.save(update_fields=['stock'])
 
-            # 4. Limpiar carrito (sin cambios)
+            # --- FIN Transacción Atómica ---
+
+            # 4. Limpiar carrito si todo OK
             if 'cart' in request.session:
                 del request.session['cart']
                 request.session.modified = True
 
-            # 5. Redirigir (sin cambios)
+            # 5. Redirigir a Recibo
             messages.success(request, f"¡Venta #{sale.id} registrada exitosamente!")
             return redirect(reverse('sales:sale_receipt', args=[sale.id]))
 
-        except ValueError as e: # Error de stock
+        # --- Manejo de Errores de la Transacción (ej. Stock) ---
+        except ValueError as e: # Error de stock u otro ValueError
             messages.error(request, str(e))
-        except Exception as e: # Otros errores
+        except Exception as e: # Otros errores inesperados
             messages.error(request, f"Ocurrió un error inesperado al procesar la venta: {e}")
 
-        # Volver a renderizar si hubo error en la transacción
+        # Volver a renderizar si hubo error DENTRO de la transacción
         return render(request, 'sales/checkout.html', {
-             'cart': cart,
-             'cart_items': get_detailed_cart_items(cart),
-             'cart_total': cart_total,
-             'clients': clients,
-             'payment_choices': payment_choices,
-             'selected_client_id': client_id,
-             'selected_payment_method': payment_method,
-             'notes': notes,
-             'amount_received': amount_received_str,
-        })
+              'cart': cart, 'cart_items': get_detailed_cart_items(cart),
+              'cart_total': cart_subtotal, 'clients': clients, 'payment_choices': payment_choices,
+              'selected_client_id': client_id, 'selected_payment_method': payment_method,
+              'notes': notes, 'amount_received': amount_received_str,
+              'discount_amount': discount_amount_str, 'discount_reason': discount_reason,
+         })
 
     else: # Método GET
+        # --- Lógica GET (sin cambios significativos) ---
         cart_items_detailed = get_detailed_cart_items(cart)
-        selected_client_id_on_load = new_client_id_from_url or '' # Usar el de la URL si existe
+        selected_client_id_on_load = new_client_id_from_url or ''
         context = {
             'cart': cart,
             'cart_items': cart_items_detailed,
-            'cart_total': cart_total,
+            'cart_total': cart_subtotal, # Pasar subtotal para display inicial
             'clients': clients,
-            'payment_choices': payment_choices, # Pasar choices a la plantilla
-            'selected_client_id': selected_client_id_on_load, # <--- Usar para preseleccionar
+            'payment_choices': payment_choices,
+            'selected_client_id': selected_client_id_on_load,
         }
         return render(request, 'sales/checkout.html', context)
 

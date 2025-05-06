@@ -12,3 +12,9 @@ excepcion en caso de que el numero llegue de una forma que no esperamos.
 ERROR-2
 Falta poner añador el boton de + para agregar un cliente 
 8.sales/templates/sales/checkout.html
+
+
+ERROR-3
+Se rompio todo el codigo y no encuentro los errores al aplicar el descuento (no inicializa y no deja hacer las migraciones)
+(PROBLEMAS DE IDENTACION) ---> se soluciono 
+
