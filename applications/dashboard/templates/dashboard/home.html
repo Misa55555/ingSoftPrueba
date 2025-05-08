@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}{{ title|default:"Inicio" }}{% endblock %}
+
+{% block content %}
+<style>
+    .dashboard-header { margin-bottom: 2rem; }
+    .dashboard-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .card {
+        background-color: #fff;
+        border: 1px solid #e3e6f0;
+        border-radius: .35rem;
+        padding: 1.25rem;
+        box-shadow: 0 .15rem 1.75rem 0 rgba(58,59,69,.15);
+        transition: transform .2s;
+    }
+    .card:hover { transform: translateY(-5px); }
+    .card-title { font-size: 0.9rem; font-weight: bold; color: #5a5c69; text-transform: uppercase; margin-bottom: .5rem; }
+    .card-metric { font-size: 1.75rem; font-weight: bold; color: #36b9cc; }
+    .card-metric.sales { color: #1cc88a; }
+    .card-metric.closures { color: #f6c23e; }
+    .card-text { font-size: .85rem; color: #858796; margin-bottom: 0; }
+
+    .quick-actions-title { margin-top: 2.5rem; margin-bottom: 1rem; font-size: 1.5rem; color: #4a4a4a; }
+    .quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+    .action-button {
+        display: block;
+        padding: 1rem 1.5rem;
+        background-color: #4e73df;
+        color: white;
+        text-decoration: none;
+        border-radius: .35rem;
+        text-align: center;
+        font-size: 1rem;
+        font-weight: bold;
+        transition: background-color .2s;
+    }
+    .action-button:hover { background-color: #2e59d9; color: white; }
+    .action-button i { margin-right: .5rem; }
+</style>
+
+<div class="container-fluid mt-4"> {# Bootstrap class, ajusta si no usas BS #}
+    <div class="dashboard-header">
+        <h1 class="h3 mb-0 text-gray-800">Bienvenido al Panel de Control, {{ request.user.username }}!</h1>
+        <p class="text-muted">Hoy es {{ "now"|date:"l, d \d\e F \d\e Y" }}</p>
+    </div>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <h4>Resumen del Día ({{ "now"|date:"d/m/Y" }})</h4>
+    <div class="dashboard-cards">
+        <div class="card">
+            <div class="card-title">Ventas Totales del Día</div>
+            <div class="card-metric sales">${{ total_sales_amount_today|floatformat:2|intcomma }}</div>
+            <div class="card-text">{{ sales_count_today }} venta{{ sales_count_today|pluralize }} registrada{{ sales_count_today|pluralize }} hoy.</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Efectivo Recaudado Hoy</div>
+            <div class="card-metric sales">${{ active_cash_sales|floatformat:2|intcomma }}</div>
+            <div class="card-text">Total en efectivo de ventas de hoy.</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Último Cierre de Caja</div>
+            {% if last_closure %}
+                <div class="card-metric closures">{{ last_closure.closing_time|date:"d/m/Y H:i" }}</div>
+                <div class="card-text">Usuario: {{ last_closure.user.username|default:"N/A" }}. Dif: ${{ last_closure.cash_difference|floatformat:2|intcomma }}</div>
+            {% else %}
+                <div class="card-text">No hay cierres registrados.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <h4>Estado Actual de Caja (Desde el {{ current_period_start_time|date:"d/m/Y H:i" }})</h4>
+     <div class="dashboard-cards">
+        <div class="card">
+            <div class="card-title">Efectivo (Periodo Actual)</div>
+            <div class="card-metric sales">${{ cash_since_last_closure|floatformat:2|intcomma }}</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Tarjeta (Periodo Actual)</div>
+            <div class="card-metric sales">${{ card_since_last_closure|floatformat:2|intcomma }}</div>
+        </div>
+         <div class="card">
+            <div class="card-title">Transferencia (Periodo Actual)</div>
+            <div class="card-metric sales">${{ transfer_since_last_closure|floatformat:2|intcomma }}</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Total (Periodo Actual)</div>
+            <div class="card-metric sales">${{ total_since_last_closure|floatformat:2|intcomma }}</div>
+        </div>
+    </div>
+
+
+    <h3 class="quick-actions-title">Acciones Rápidas</h3>
+    <div class="quick-actions">
+        <a href="{% url 'sales:pos_view' %}" class="action-button">
+            <i class="fas fa-cash-register"></i> Realizar Venta
+        </a>
+        <a href="{% url 'stock:product_list_create' %}" class="action-button">
+            <i class="fas fa-boxes"></i> Gestionar Stock
+        </a>
+        <a href="{% url 'closures:perform_closure' %}" class="action-button">
+            <i class="fas fa-calculator"></i> Realizar Cierre de Caja
+        </a>
+        <a href="{% url 'closures:closure_history' %}" class="action-button">
+            <i class="fas fa-history"></i> Historial de Cierres
+        </a>
+        
+        {# Añadir más enlaces a medida que creas módulos #} <!---->
+        {# <a href="{% url 'analysis:sales_report' %}" class="action-button">
+            <i class="fas fa-chart-line"></i> Análisis de Ventas
+        </a>
+        <a href="#" class="action-button"> {# Reemplazar # con url de ajustes #}
+            <i class="fas fa-cog"></i> Ajustes
+        </a> #}
+    </div>
+</div>
+
+{# FontAwesome si no está en base.html #}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+{% endblock %}

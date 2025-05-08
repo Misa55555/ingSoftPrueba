@@ -38,7 +38,8 @@ INSTALLED_APPS = [
     #local
     'applications.stock',
     'applications.sales',
-    'applications.closures',    
+    'applications.closures',  
+    'applications.dashboard',  
 ]
 
 MIDDLEWARE = [
@@ -117,3 +118,6 @@ STATICFILES_DIRS = [
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGIN_URL = '/accounts/login/' # O la URL de tu vista de login
+LOGIN_REDIRECT_URL = '/'      # Redirige a la raíz (dashboard) después del login

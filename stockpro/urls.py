@@ -16,12 +16,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+#---------#
+from django.contrib.auth import views as auth_views # Para vistas de login/logout
+from applications.dashboard.views import dashboard_view # Importar la vista del dashboard
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', dashboard_view, name='home'),
     path('stock/', include('applications.stock.urls', namespace='stock')),
     path('sales/', include('applications.sales.urls', namespace='sales')),
     path('closures/', include('applications.closures.urls', namespace='closures')),
-    # ... Path para la vista Home/Dashboard (a crear después)
-    # path('', include('applications.dashboard.urls'), name='dashboard_home'),
 ]

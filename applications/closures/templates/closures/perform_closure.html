@@ -105,7 +105,8 @@
             {# Mostrar diferencia con JS o después del POST si se recarga con error #}
             <div class="form-group">
                 <label>Efectivo Esperado (Sistema):</label>
-                <span class="calculated-value" id="expected-cash-display">${{ expected_cash|floatformat:2|intcomma }}</span>
+                <span class="calculated-value">{{ expected_cash|floatformat:2|intcomma }}</span>
+                <span id="expected-cash-value-for-js" data-expected-cash="{{ expected_cash|floatformat:2 }}" style="display: none;"></span>
             </div>
             <div class="form-group">
                 <label>Diferencia de Efectivo:</label>
@@ -136,56 +137,59 @@
 {% block extra_scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const countedCashInput = document.getElementById('{{ form.counted_cash.id_for_label }}'); // Usar ID del form
-    const expectedCashDisplay = document.getElementById('expected-cash-display');
+    const countedCashInput = document.getElementById('{{ form.counted_cash.id_for_label }}');
+    // --- MODIFICACIÓN: Referencia al SPAN que contiene el valor de expected_cash ---
+    // Este span es poblado por Django en el backend y NO debería tener comas para el JS
+    const expectedCashValueSpan = document.getElementById('expected-cash-value-for-js'); // Necesitaremos este span en el HTML
     const cashDifferenceDisplay = document.getElementById('cash-difference-display');
     const differenceVisualFeedback = document.getElementById('difference-visual-feedback');
 
-    // Obtener el valor de expected_cash (puede necesitar parseo si tiene comas por intcomma)
-    // Es más seguro pasar este valor desde el contexto o un data-attribute si hay formatos complejos.
-    // Por ahora, intentamos leerlo del span, asumiendo formato simple o que JS lo maneje.
-    let expectedCashValue = 0;
-    if (expectedCashDisplay) {
-        // Quitar '$' y comas, luego convertir a float
-        let textValue = expectedCashDisplay.textContent.replace('$', '').replace(/,/g, '');
-        expectedCashValue = parseFloat(textValue) || 0;
+    let expectedCashValue = 0; // Variable para almacenar el valor numérico
+
+    if (expectedCashValueSpan) {
+        // --- MODIFICACIÓN: Leer el valor de un data-attribute es más seguro ---
+        // El data-attribute no tendrá formato de 'intcomma'
+        expectedCashValue = parseFloat(expectedCashValueSpan.dataset.expectedCash || '0');
+        console.log("Expected Cash (JS): ", expectedCashValue); // Para depurar
+    } else {
+        console.error("Elemento 'expected-cash-value-for-js' no encontrado.");
     }
 
-
     function updateCashDifference() {
-        if (!countedCashInput || !cashDifferenceDisplay) return;
+        if (!countedCashInput || !cashDifferenceDisplay || expectedCashValueSpan === null) return;
 
         const countedCash = parseFloat(countedCashInput.value) || 0;
-        const difference = countedCash - expectedCashValue;
+        const difference = countedCash - expectedCashValue; // Aquí la resta usa el expectedCashValue leído
 
-        cashDifferenceDisplay.textContent = '$' + difference.toFixed(2);
+        console.log("Counted Cash:", countedCash, "Expected Cash:", expectedCashValue, "Difference:", difference); // Para depurar
 
-        // Feedback visual para la diferencia
+        cashDifferenceDisplay.textContent = '$' + difference.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,'); // Añadir comas para display
+
         if (differenceVisualFeedback) {
             differenceVisualFeedback.style.display = 'block';
-            differenceVisualFeedback.textContent = 'Diferencia: $' + difference.toFixed(2);
+            let feedbackText = 'Diferencia: $' + difference.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
             if (difference > 0) {
                 differenceVisualFeedback.className = 'difference-display positive';
-                differenceVisualFeedback.textContent += ' (Sobrante)';
+                feedbackText += ' (Sobrante)';
             } else if (difference < 0) {
                 differenceVisualFeedback.className = 'difference-display negative';
-                differenceVisualFeedback.textContent += ' (Faltante)';
+                feedbackText += ' (Faltante)';
             } else {
                 differenceVisualFeedback.className = 'difference-display zero';
-                differenceVisualFeedback.textContent += ' (Cuadra Perfecto)';
+                feedbackText += ' (Cuadra Perfecto)';
             }
+            differenceVisualFeedback.textContent = feedbackText;
         }
     }
 
     if (countedCashInput) {
         countedCashInput.addEventListener('input', updateCashDifference);
-        // Calcular diferencia inicial si el campo tiene un valor (ej. si hay un error de form y se recarga)
         if (countedCashInput.value) {
             updateCashDifference();
         }
     }
 });
 </script>
-{# Necesitarás FontAwesome si usas los iconos #}
+{# FontAwesome si lo usas #}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
 {% endblock %}
