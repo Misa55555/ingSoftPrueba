@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Iniciar Sesión{% endblock %}
+
+{% block content %}
+<style>
+    .login-container { max-width: 400px; margin: 50px auto; padding: 25px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; box-shadow: 0 .15rem 1.75rem 0 rgba(58,59,69,.15); }
+    .login-container h2 { text-align: center; margin-bottom: 20px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+    .form-group input[type="text"],
+    .form-group input[type="password"] {
+    width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+}
+    .login-button { display: block; width: 100%; padding: 10px; background-color: #4e73df; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; }
+    .login-button:hover { background-color: #2e59d9; }
+    .error-message { color: red; margin-bottom: 15px; text-align: center; }
+</style>
+
+<div class="login-container">
+        <h2>Iniciar Sesión</h2>
+
+        {% if form.errors %}
+            <p class="error-message">Tu nombre de usuario y contraseña no coinciden. Por favor, inténtalo de nuevo.</p>
+        {% endif %}
+
+        {% if next %}
+            {% if user.is_authenticated %}
+                <p class="error-message">Tu cuenta no tiene acceso a esta página. Para proceder,
+                por favor, inicia sesión con una cuenta que tenga acceso.</p>
+            {% else %}
+                <p class="text-muted text-center mb-3">Por favor, inicia sesión para ver esta página.</p>
+            {% endif %}
+        {% endif %}
+
+        <form method="post" action="{% url 'login' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="{{ form.username.id_for_label }}">Usuario:</label>
+                {{ form.username }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.password.id_for_label }}">Contraseña:</label>
+                {{ form.password }}
+            </div>
+            <button type="submit" class="login-button">Ingresar</button>
+            <input type="hidden" name="next" value="{{ next }}">
+        </form>
+    </div>
+    {% endblock %}
+    ```
+
+      * Este formulario es muy básico. Usa los campos `form.username` y `form.password` que provee la vista de login de Django.
+      * Maneja mensajes de error si el login falla.
+      * Incluye el parámetro `next` para redirigir al usuario a la página que intentaba acceder después de un login exitoso.

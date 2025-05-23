@@ -1,0 +1,476 @@
+{% extends 'base.html' %}
+{% load static %} {# Para el JavaScript del formset y tu JS custom #}
+{% load humanize %}
+
+{% block title %}{{ title|default:"Gestión de Inventario" }}{% endblock %}
+
+{% block extra_styles %} {# Bloque para CSS específico de esta página #}
+<style>
+    .stock-page-container { max-width: 1200px; margin: 20px auto; }
+    .form-section-stock {
+        background-color: #f8f9fa;
+        padding: 25px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+    .form-section-stock h3 { border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-bottom: 20px; color: #0056b3; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-weight: bold; margin-bottom: .5rem; }
+    .form-control, .form-select {
+        width: 100%; padding: .375rem .75rem; font-size: 1rem; line-height: 1.5;
+        color: #495057; background-color: #fff; background-clip: padding-box;
+        border: 1px solid #ced4da; border-radius: .25rem;
+        transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+    }
+    .select-with-add { display: flex; align-items: center; gap: 10px; }
+    .select-with-add select { flex-grow: 1; }
+    .btn-add-modal { padding: .375rem .75rem; font-size: 1rem; }
+
+    .btn-primary-stock { background-color: #007bff; border-color: #007bff; color: white; padding: 0.5rem 1rem; font-size: 1rem; border-radius: 0.25rem; cursor: pointer; }
+    .btn-primary-stock:hover { background-color: #0056b3; border-color: #0056b3; }
+    .btn-success-stock { background-color: #28a745; border-color: #28a745; color: white; padding: 0.5rem 1rem; font-size: 1rem; border-radius: 0.25rem; cursor: pointer;}
+    .btn-success-stock:hover { background-color: #1e7e34; border-color: #1e7e34; }
+
+    /* Estilos para el Formset */
+    .formset-row { display: flex; gap: 15px; align-items: flex-start; padding: 10px; border-bottom: 1px solid #eee; }
+    .formset-row > div { flex: 1; } /* Ajustar según necesidad de campos */
+    .formset-row .product-field { flex: 3; }
+    .formset-row .quantity-field { flex: 1; }
+    .formset-row .price-field { flex: 1; }
+    .formset-row .delete-field { flex: 0 0 50px; text-align: center; margin-top: 2rem;}
+    .btn-add-formset-row { margin-top: 15px; }
+
+    /* Estilos para Modales (Genéricos - puedes usar Bootstrap o personalizarlos) */
+    .modal { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+    .modal-content { background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; border-radius: 8px; position: relative; }
+    .modal-header { padding: 10px 15px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; }
+    .modal-title { margin-bottom: 0; line-height: 1.5; font-size: 1.25rem; }
+    .modal-body { padding: 15px; }
+    .modal-footer { padding: 10px 15px; border-top: 1px solid #dee2e6; text-align: right; }
+    .close-modal-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; background: none; border: none; cursor: pointer; }
+    .close-modal-btn:hover, .close-modal-btn:focus { color: black; text-decoration: none; }
+    #modal-messages { margin-bottom: 15px; }
+
+    /* Estilos para la tabla de productos */
+    .product-list-section { margin-top: 30px; }
+    .product-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .product-table th, .product-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    .product-table th { background-color: #f2f2f2; }
+
+    /* Mensajes de Django */
+    .messages { list-style: none; padding: 0; margin-bottom: 15px; }
+    .messages li { padding: 10px 15px; margin-bottom: 10px; border-radius: 4px; }
+    .messages li.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .messages li.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .messages li.warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stock-page-container">
+    <h1><i class="fas fa-dolly-flatbed"></i> {{ title }}</h1>
+    <hr>
+
+    {% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if can_manage_fully %} {# Mostrar secciones de carga solo si tiene permiso #}
+    <div class="form-section-stock">
+        <h3><i class="fas fa-plus-circle"></i> Cargar Nuevo Producto</h3>
+        <form method="post" id="product-form">
+            {% csrf_token %}
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="{{ product_form.name.id_for_label }}">{{ product_form.name.label }}:</label>
+                    {{ product_form.name }} {{ product_form.name.errors }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ product_form.price.id_for_label }}">{{ product_form.price.label }}:</label>
+                    {{ product_form.price }} {{ product_form.price.errors }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ product_form.category.id_for_label }}">{{ product_form.category.label }}:</label>
+                    <div class="select-with-add">
+                        {{ product_form.category }}
+                        <button type="button" class="btn btn-secondary btn-sm btn-add-modal" data-modal-target="#categoryModal" data-form-url="{% url 'stock:add_category_ajax' %}" data-select-target=".select-category" title="Nueva Categoría">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    {{ product_form.category.errors }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ product_form.brand.id_for_label }}">{{ product_form.brand.label }}:</label>
+                    <div class="select-with-add">
+                        {{ product_form.brand }}
+                        <button type="button" class="btn btn-secondary btn-sm btn-add-modal" data-modal-target="#brandModal" data-form-url="{% url 'stock:add_brand_ajax' %}" data-select-target=".select-brand" title="Nueva Marca">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    {{ product_form.brand.errors }}
+                </div>
+                <div class="form-group" style="grid-column: span 2;"> {# Descripción ocupa más espacio #}
+                    <label for="{{ product_form.description.id_for_label }}">{{ product_form.description.label }}:</label>
+                    {{ product_form.description }} {{ product_form.description.errors }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ product_form.bar_code.id_for_label }}">{{ product_form.bar_code.label }}:</label>
+                    {{ product_form.bar_code }} {{ product_form.bar_code.errors }}
+                </div>
+            </div>
+            <button type="submit" name="submit_product" class="btn-primary-stock mt-3"><i class="fas fa-save"></i> Guardar Producto</button>
+        </form>
+    </div>
+
+    <div class="form-section-stock">
+        <h3><i class="fas fa-truck-loading"></i> Cargar Remito (Ingreso de Stock)</h3>
+        <form method="post" id="stock-entry-form">
+            {% csrf_token %}
+            {{ stock_entry_detail_formset.management_form }} {# MUY IMPORTANTE para el formset #}
+
+            <h4>Datos del Remito</h4>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="{{ stock_entry_form.supplier.id_for_label }}">{{ stock_entry_form.supplier.label }}:</label>
+                    <div class="select-with-add">
+                        {{ stock_entry_form.supplier }}
+                        <button type="button" class="btn btn-secondary btn-sm btn-add-modal" data-modal-target="#supplierModal" data-form-url="{% url 'stock:add_supplier_ajax' %}" data-select-target=".select-supplier" title="Nuevo Proveedor">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    {{ stock_entry_form.supplier.errors }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ stock_entry_form.remito_number.id_for_label }}">{{ stock_entry_form.remito_number.label }}:</label>
+                    {{ stock_entry_form.remito_number }} {{ stock_entry_form.remito_number.errors }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ stock_entry_form.date_received.id_for_label }}">{{ stock_entry_form.date_received.label }}:</label>
+                    {{ stock_entry_form.date_received }} {{ stock_entry_form.date_received.errors }}
+                </div>
+                 <div class="form-group" style="grid-column: span 2;">
+                    <label for="{{ stock_entry_form.notes.id_for_label }}">{{ stock_entry_form.notes.label }}:</label>
+                    {{ stock_entry_form.notes }} {{ stock_entry_form.notes.errors }}
+                </div>
+            </div>
+
+            <h4 class="mt-4">Detalle de Productos del Remito</h4>
+            <div id="stock-entry-details-container">
+                {% for form_detail in stock_entry_detail_formset %}
+                <div class="formset-row" id="{{ form_detail.prefix }}-row">
+                    <div class="product-field">{{ form_detail.product.label_tag }} {{ form_detail.product }} {{ form_detail.product.errors }}</div>
+                    <div class="quantity-field">{{ form_detail.quantity.label_tag }} {{ form_detail.quantity }} {{ form_detail.quantity.errors }}</div>
+                    <div class="price-field">{{ form_detail.purchase_price.label_tag }} {{ form_detail.purchase_price }} {{ form_detail.purchase_price.errors }}</div>
+                    {% if form_detail.instance.pk or stock_entry_detail_formset.can_delete %}
+                    <div class="delete-field">
+                        {% if stock_entry_detail_formset.can_delete %}
+                            {{ form_detail.DELETE.label_tag }} {{ form_detail.DELETE }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {{ form_detail.id }} {# Campo oculto para ID si se edita #}
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-detail-row" class="btn btn-secondary btn-sm mt-2"><i class="fas fa-plus"></i> Añadir Producto al Remito</button>
+
+            <button type="submit" name="submit_stock_entry" class="btn-success-stock mt-4"><i class="fas fa-check-circle"></i> Guardar Ingreso y Actualizar Stock</button>
+        </form>
+        <div id="empty-detail-form" style="display: none;">
+            <div class="formset-row" id="__prefix__-row">
+                <div class="product-field">{{ stock_entry_detail_formset.empty_form.product.label_tag }} {{ stock_entry_detail_formset.empty_form.product }}</div>
+                <div class="quantity-field">{{ stock_entry_detail_formset.empty_form.quantity.label_tag }} {{ stock_entry_detail_formset.empty_form.quantity }}</div>
+                <div class="price-field">{{ stock_entry_detail_formset.empty_form.purchase_price.label_tag }} {{ stock_entry_detail_formset.empty_form.purchase_price }}</div>
+                {% if stock_entry_detail_formset.can_delete %}
+                <div class="delete-field">
+                    {{ stock_entry_detail_formset.empty_form.DELETE.label_tag }} {{ stock_entry_detail_formset.empty_form.DELETE }}
+                </div>
+                {% endif %}
+                {{ stock_entry_detail_formset.empty_form.id }}
+            </div>
+        </div>
+    </div>
+    {% else %}
+        <p class="alert alert-warning">No tienes permisos para cargar productos o remitos.</p>
+    {% endif %} {# Fin de can_manage_fully #}
+
+
+    <div class="product-list-section form-section-stock">
+        <h3><i class="fas fa-list-ul"></i> Lista de Productos Registrados</h3>
+        <form method="get" class="mb-3">
+            <div class="input-group">
+                <input type="text" name="q" class="form-control" placeholder="Buscar producto por nombre..." value="{{ search_query }}">
+                <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search"></i> Buscar</button>
+            </div>
+        </form>
+
+        {% if products_list %}
+        <div class="table-responsive">
+            <table class="product-table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Marca</th>
+                        <th>Categoría</th>
+                        <th>Precio Venta</th>
+                        <th>Stock</th>
+                        <th>Cód. Barras</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products_list %}
+                    <tr>
+                        <td>{{ product.name }}</td>
+                        <td>{{ product.brand.name }}</td>
+                        <td>{{ product.category.name }}</td>
+                        <td>${{ product.price|floatformat:2|intcomma }}</td>
+                        <td>{{ product.stock|intcomma }}</td>
+                        <td>{{ product.bar_code|default:"N/A" }}</td>
+                        <td>
+                            {# <a href="#" class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></a> #}
+                            {# <a href="#" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></a> #}
+                            </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No hay productos registrados que coincidan con tu búsqueda.</p>
+        {% endif %}
+    </div>
+
+    <div id="categoryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nueva Categoría</h5>
+                <button type="button" class="close-modal-btn" data-modal-target="#categoryModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-messages-category" class="modal-messages"></div>
+                <form id="categoryModalForm">
+                    {% csrf_token %} {{ category_modal_form.as_p }} {# Fallback si JS no carga el form_html de error #}
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal-btn" data-modal-target="#categoryModal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveCategoryModal">Guardar Categoría</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="brandModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nueva Marca</h5>
+                <button type="button" class="close-modal-btn" data-modal-target="#brandModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-messages-brand" class="modal-messages"></div>
+                <form id="brandModalForm">
+                     {% csrf_token %}
+                    {{ brand_modal_form.as_p }}
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal-btn" data-modal-target="#brandModal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveBrandModal">Guardar Marca</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="supplierModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Proveedor</h5>
+                <button type="button" class="close-modal-btn" data-modal-target="#supplierModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-messages-supplier" class="modal-messages"></div>
+                <form id="supplierModalForm">
+                    {% csrf_token %}
+                    {{ supplier_modal_form.as_p }}
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal-btn" data-modal-target="#supplierModal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveSupplierModal">Guardar Proveedor</button>
+            </div>
+        </div>
+    </div>
+
+</div> {# Fin stock-page-container #}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'admin/js/vendor/jquery/jquery.min.js' %}"></script> {# O tu propia versión de jQuery #}
+<script src="{% static 'admin/js/jquery.init.js' %}"></script>
+<script src="{% static 'admin/js/inlines.js' %}"></script> {# Esto maneja el "Añadir otro" y "Borrar" del formset básico #}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modals = document.querySelectorAll('.modal');
+    const addModalButtons = document.querySelectorAll('.btn-add-modal');
+    const closeModalButtons = document.querySelectorAll('.close-modal-btn');
+
+    // --- Funcionalidad de Modales ---
+    function openModal(modal) {
+        if (modal) modal.style.display = 'block';
+    }
+
+    function closeModal(modal) {
+        if (modal) {
+            modal.style.display = 'none';
+            // Limpiar formulario y mensajes de error dentro del modal
+            const form = modal.querySelector('form');
+            if (form) form.reset(); // Resetea los campos del formulario
+            const modalMessages = modal.querySelector('.modal-messages');
+            if (modalMessages) modalMessages.innerHTML = '';
+            // Limpiar errores de campos individuales (si el form_html los renderizó)
+            const errorFeedbacks = modal.querySelectorAll('.invalid-feedback');
+            errorFeedbacks.forEach(fb => fb.style.display = 'none');
+             // Limpiar el contenido del modal-body que pudo haber sido reemplazado por form_html
+            if (modal.id === 'categoryModal') modal.querySelector('.modal-body').innerHTML = `<div id="modal-messages-category" class="modal-messages"></div><form id="categoryModalForm">{% csrf_token %}{{ category_modal_form.as_p|escapejs }}</form>`;
+            else if (modal.id === 'brandModal') modal.querySelector('.modal-body').innerHTML = `<div id="modal-messages-brand" class="modal-messages"></div><form id="brandModalForm">{% csrf_token %}{{ brand_modal_form.as_p|escapejs }}</form>`;
+            else if (modal.id === 'supplierModal') modal.querySelector('.modal-body').innerHTML = `<div id="modal-messages-supplier" class="modal-messages"></div><form id="supplierModalForm">{% csrf_token %}{{ supplier_modal_form.as_p|escapejs }}</form>`;
+
+        }
+    }
+
+    addModalButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const modalTargetId = button.dataset.modalTarget;
+            const modal = document.querySelector(modalTargetId);
+            // Guardar info en el modal para el submit
+            modal.dataset.formUrl = button.dataset.formUrl;
+            modal.dataset.selectTarget = button.dataset.selectTarget;
+            openModal(modal);
+        });
+    });
+
+    closeModalButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const modalTargetId = button.dataset.modalTarget;
+            const modal = document.querySelector(modalTargetId);
+            closeModal(modal);
+        });
+    });
+
+    window.addEventListener('click', (event) => {
+        modals.forEach(modal => {
+            if (event.target == modal) {
+                closeModal(modal);
+            }
+        });
+    });
+
+    function handleModalFormSubmit(modalId, formId, saveButtonId) {
+        const saveButton = document.getElementById(saveButtonId);
+        if (!saveButton) return;
+
+        saveButton.addEventListener('click', function() {
+            const modal = document.getElementById(modalId);
+            const form = document.getElementById(formId);
+            const url = modal.dataset.formUrl;
+            const selectTargetClass = modal.dataset.selectTarget;
+            const formData = new FormData(form);
+            const modalMessagesDiv = modal.querySelector('.modal-messages');
+            modalMessagesDiv.innerHTML = ''; // Limpiar mensajes previos
+
+            fetch(url, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => {
+                if (response.status === 400) { // Error de validación del formulario
+                    return response.json().then(data => {
+                        throw { status: 400, data: data }; // Lanzar para el catch
+                    });
+                }
+                if (!response.ok) {
+                    throw new Error('Error de red o servidor: ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    modalMessagesDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                    // Actualizar todos los selects que coincidan con la clase target
+                    const selectsToUpdate = document.querySelectorAll(selectTargetClass);
+                    selectsToUpdate.forEach(selectElement => {
+                        const option = new Option(data.new_option_text, data.new_option_value, false, true); // texto, valor, defaultSelected, selected
+                        selectElement.add(option);
+                        selectElement.value = data.new_option_value; // Seleccionar la nueva opción
+                    });
+                    // Cerrar modal después de un breve retraso
+                    setTimeout(() => closeModal(modal), 1000);
+                } else { // Otros errores de lógica de la app
+                    modalMessagesDiv.innerHTML = `<div class="alert alert-danger">${data.message || 'Error desconocido.'}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error en submit del modal:', error);
+                if (error.status === 400 && error.data && error.data.form_html) {
+                    // Reemplazar el contenido del form en el modal con el HTML que incluye errores
+                    modal.querySelector('.modal-body').innerHTML = error.data.form_html;
+                    // Re-adjuntar listeners o manejar el form como sea necesario si se reemplaza mucho
+                } else if (error.data && error.data.message) {
+                     modalMessagesDiv.innerHTML = `<div class="alert alert-danger">${error.data.message}</div>`;
+                } else {
+                    modalMessagesDiv.innerHTML = `<div class="alert alert-danger">Ocurrió un error al guardar. Intenta de nuevo.</div>`;
+                }
+            });
+        });
+    }
+
+    handleModalFormSubmit('categoryModal', 'categoryModalForm', 'saveCategoryModal');
+    handleModalFormSubmit('brandModal', 'brandModalForm', 'saveBrandModal');
+    handleModalFormSubmit('supplierModal', 'supplierModalForm', 'saveSupplierModal');
+
+
+    // --- Funcionalidad para el Formset de Detalles del Remito ---
+    const detailsContainer = document.getElementById('stock-entry-details-container');
+    const addButton = document.getElementById('add-detail-row');
+    const emptyFormTemplate = document.getElementById('empty-detail-form').innerHTML;
+    const totalFormsInput = document.querySelector('#id_details-TOTAL_FORMS'); // Input de management form
+
+    if (addButton && detailsContainer && totalFormsInput && emptyFormTemplate) {
+        addButton.addEventListener('click', function() {
+            let formIdx = parseInt(totalFormsInput.value);
+            // Reemplazar __prefix__ con el nuevo índice en la plantilla del formulario
+            let newFormHtml = emptyFormTemplate.replace(/__prefix__/g, formIdx);
+            detailsContainer.insertAdjacentHTML('beforeend', newFormHtml);
+            totalFormsInput.value = formIdx + 1; // Incrementar el contador de formularios
+
+            // Aquí podrías inicializar selectores especiales (como select2) si los usas en las nuevas filas
+        });
+    }
+
+    // Delegación de eventos para botones de borrado de filas del formset (si los añades)
+    // O manejo del checkbox DELETE de Django
+    detailsContainer.addEventListener('change', function(event) {
+        if (event.target.matches('input[type="checkbox"][name$="-DELETE"]')) {
+            const row = event.target.closest('.formset-row');
+            if (event.target.checked) {
+                row.style.opacity = '0.5';
+                row.style.textDecoration = 'line-through';
+            } else {
+                row.style.opacity = '1';
+                row.style.textDecoration = 'none';
+            }
+        }
+    });
+
+});
+</script>
+{% endblock %}

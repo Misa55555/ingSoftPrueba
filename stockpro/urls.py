@@ -21,8 +21,15 @@ from django.contrib.auth import views as auth_views # Para vistas de login/logou
 from applications.dashboard.views import dashboard_view # Importar la vista del dashboard
 
 
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', dashboard_view, name='home'),
+     # --- URLs DE AUTENTICACIÓN ---
+    path('accounts/login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
+    path('accounts/logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'), # Redirige a login después de logout
+    # ------------------------------
+
     path('', dashboard_view, name='home'),
     path('stock/', include('applications.stock.urls', namespace='stock')),
     path('sales/', include('applications.sales.urls', namespace='sales')),

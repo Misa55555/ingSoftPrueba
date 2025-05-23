@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
+    'django_extensions',
     #local
     'applications.stock',
     'applications.sales',
@@ -119,5 +120,6 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-LOGIN_URL = '/accounts/login/' # O la URL de tu vista de login
-LOGIN_REDIRECT_URL = '/'      # Redirige a la raíz (dashboard) después del login
+LOGIN_URL = 'login' # la URL la vista de login
+LOGIN_REDIRECT_URL = 'home' # Nombre de la URL del dashboard (es a donde va post-login)
+LOGOUT_REDIRECT_URL = 'login' # A dónde ir después del logout (puede ser 'home' también)

@@ -24,7 +24,7 @@ class Client(models.Model):
     ]
 
     client_name = models.CharField(max_length=150, verbose_name="Nombre o Razón Social")
-    # CUIT/CUIL - Hacerlo único y opcional (un Consumidor Final puede no tenerlo registrado)
+    # CUIT/CUIL - Hacerlo unico y opcional (un Consumidor Final puede no tenerlo registrado)
     tax_id = models.CharField(
         max_length=13, # Formato XX-XXXXXXXX-X
         unique=True,
@@ -59,10 +59,10 @@ class Client(models.Model):
         # Validación: Si no es Consumidor Final, CUIT/CUIL debería ser obligatorio
         if self.tax_condition != 'CF' and not self.tax_id:
             raise ValidationError({'tax_id': 'El CUIT/CUIL es requerido para esta condición de IVA.'})
-        # Asegurarse que si es Consumidor Final, no tenga CUIT/CUIL (o manejarlo según reglas AFIP)
+        # Asegurarse que si es Consumidor Final, no tenga CUIT/CUIL (o manejarlo segun reglas AFIP)
         # if self.tax_condition == 'CF' and self.tax_id:
         #     raise ValidationError({'tax_id': 'Un Consumidor Final no debería tener CUIT/CUIL asociado.'})
-        pass # Puedes añadir más validaciones
+        pass 
 
 class Sale(models.Model):
     PAYMENT_METHOD_CHOICES = [
@@ -121,7 +121,7 @@ class Sale(models.Model):
     )
     notes = models.TextField(blank=True, null=True, verbose_name="Notas Adicionales")
 
-    # --- Meta Clase (sin cambios) ---
+    # --- Meta Clase  ---
     class Meta:
         verbose_name = "Venta"
         verbose_name_plural = "Ventas"
@@ -135,20 +135,16 @@ class Sale(models.Model):
              return self.total_amount + self.discount_amount
         return self.total_amount # Fallback
 
-    # --- Método __str__ (Corregido indentación) ---
+    # --- Método __str__  ---
     def __str__(self):
         client_name = self.client.client_name if self.client else "Consumidor Final"
         return f"Venta #{self.id} - {client_name} - {self.sale_date.strftime('%Y-%m-%d %H:%M')}"
 
     # --- Método clean (Corregido indentación y validación) ---
     def clean(self):
-        # Validación de Descuento (más simple y segura aquí)
+        # Validación de Descuento 
         if self.discount_amount < 0:
             raise ValidationError({'discount_amount': 'El descuento no puede ser negativo.'})
-
-        # Es difícil validar aquí que el descuento no exceda el subtotal,
-        # porque el subtotal no está guardado directamente.
-        # Es mejor validar esto en la VISTA antes de guardar.
 
         # También es mejor validar la suficiencia del monto recibido en la VISTA.
         # Aquí podríamos validar que si hay cambio, no sea negativo.
@@ -159,7 +155,7 @@ class Sale(models.Model):
     def save(self, *args, **kwargs):
         # Quitamos el cálculo automático de 'change_given'.
         # Este cálculo es más seguro hacerlo en la vista 'checkout_view'
-        # ANTES de crear el objeto Sale, porque allí tenemos acceso fácil
+        # ANTES de crear el objeto Sale, porque ahi tenemos acceso fácil
         # al subtotal, descuento y monto recibido validados.
         super().save(*args, **kwargs) # Llamar al método save original
 
@@ -186,7 +182,7 @@ class SaleDetail(models.Model):
     quantity = models.PositiveIntegerField(verbose_name="Cantidad")
     # Guarda el precio al momento de la venta, porque el precio del producto puede cambiar
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio Unitario")
-    # Podrías añadir el subtotal aquí si quieres: quantity * unit_price
+    # se podria añadir el subtotal  quantity * unit_price
 
     class Meta:
         verbose_name = "Detalle de Venta"

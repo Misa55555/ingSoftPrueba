@@ -22,21 +22,28 @@
     </style>
 </head>
 <body>
-
     <header>
         {# Aquí podrías poner tu barra de navegación principal #}
         {# Ejemplo simple: #}
         <nav>
-            <a href="/">Inicio</a> |
-            <a href="{% url 'stock:product_list_create' %}">Gestión Stock</a> |
-            <a href="{% url 'sales:pos_view' %}">Ventas</a>
-            {# Añade enlaces de login/logout si usas autenticación #}
-            {% if user.is_authenticated %}
-               | <span>Hola, {{ user.username }}</span> | <a href="#">Logout</a> {# Reemplaza # con tu URL de logout #}
-            {% else %}
-               | <a href="#">Login</a> {# Reemplaza # con tu URL de login #}
-            {% endif %}
-        </nav>
+                    <a href="{% url 'home' %}">Inicio</a> |
+                    <a href="{% url 'stock:manage_stock' %}">Stock</a> |
+                    <a href="{% url 'sales:pos_view' %}">Ventas</a> |
+                    <a href="{% url 'closures:perform_closure' %}">Cierre Caja</a> |
+                    <a href="{% url 'closures:closure_history' %}">Hist. Cierres</a>
+
+                    {% if user.is_authenticated %}
+                       | <span style="color: #555;">Usuario: {{ user.username }}</span>
+                       {% if user.groups.all %}
+                           (Rol: {% for group in user.groups.all %}{{ group.name }}{% if not forloop.last %}, {% endif %}{% endfor %})
+                       {% elif user.is_superuser %}
+                           (Rol: Superusuario)
+                       {% endif %}
+                       | <a href="{% url 'logout' %}">Cerrar Sesión</a>
+                    {% else %}
+                       | <a href="{% url 'login' %}">Iniciar Sesión</a>
+                    {% endif %}
+                </nav>
         <hr>
     </header>
 
