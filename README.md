@@ -1,29 +1,49 @@
-REGLAS Y EXPLICACION
+# 📌 **Guía de trabajo para el proyecto**
 
-EXPLICACION:
-1. Unicamente se hace push a la rama main en caso de que una seccion (vista) sea valida por todo el grupo, en caso contrario no podra realizarse un push.
-2. La rama "test" sigue el mismo orden que la rama "main" con la diferencia que ahi se probaran los cambios realizados en las demas ramas
-3. a partir de la rama "test" se crearan ramas que saldran de esa misma, esas ramas seran para manejar: soluciones,cambios,agregados,eliminar etc con respecto al PRODUCT BACKLOG
-4. No subir nada que no corresponda al PRODUCT BACKLOG
+## 🧠 **Explicación general del flujo de trabajo**
 
-   estructura de ejemplo
- 1.     main/
- 2.       ---test/
- 3.          ---/STOCK
- 4.            ---/"solucion problema de agregado de stock"
+1. 🔒 **La rama `main`** solo recibe cambios cuando **todo el grupo valida una sección completa** (vista final y funcional).
+2. 🧪 **La rama `test`** sigue el mismo orden que `main`, pero se usa para **probar cambios** antes de que lleguen a producción.
+3. 🌿 A partir de `test` se crean **ramas específicas por funcionalidad**, para trabajar sobre cada punto del **Product Backlog**.
+4. 🚫 No se debe subir nada que **no esté vinculado directamente al Backlog**.
 
-    ES IMPORTANTE ENTENDER QUE UNA VEZ QUE TENGAMOS "solucion problema de agregado de stock" se pushea a STOCK, cuando STOCK se encuentre listo y no necesite mas cambios, se manda a TEST
-    Luego de confirmar que en TEST anda correctamente se pasara a "MAIN" (si el grupo lo considera)
+### 🧱 **Estructura recomendada:**
 
+```
+main/
+ └── test/
+      └── STOCK/
+           └── solucion problema de agregado de stock (rama local, no se pushea)
+```
 
-REGLAS:
-1. No agregar codigo que no corresponda a los backlog
-2. usar la misma sintaxis en todo el codigo
-3. usar atributos,clases,nombres en general que se entiendan para el que vaya a leer
-4. intentar documentar todo lo posible
-5. Los push de ramas no se debe de hacer, lo que deberian de hacer es: CREAR UNA RAMA en la VISTA que quieren modificar y apartir de ahi trabajar de forma local, una vez terminado
-   el cambio lo mandan a la rama (vista que modificaron) y ahi realizan un push de los cambios (REPITO, no hacer PUSH DE RAMAS)
+1. Trabajás localmente en la rama: `test/STOCK/solucion problema de agregado de stock`
+2. Cuando terminás, hacés merge local de esa rama a `STOCK`
+3. Pusheás la rama `STOCK`
+4. Cuando esté todo bien y revisado, se mergea `STOCK` a `test`
+5. Si el grupo aprueba el cambio, finalmente se mergea `test` a `main`
 
+---
 
+## ✅ **Reglas de trabajo**
 
-GRACIAS 
+1. 🚫 No agregar código que no esté en el Backlog
+2. 🧾 Usar **la misma sintaxis** en todo el código
+3. 🧠 Usar nombres claros para **atributos, funciones y clases**
+4. 📝 Documentar **todo lo posible**
+5. 📤 **Nunca push de ramas locales**:
+
+   * Creá una rama **local** dentro de la vista que querés modificar
+   * Hacés el cambio en esa rama
+   * Mergeás esa rama local a la rama (vista) principal
+   * Solo ahí hacés push
+
+---
+
+**💡 Recomendación:**
+👉 Hacer `git pull` cada vez que se arranca a trabajar
+🧹 Eliminar ramas locales que ya no se usen
+📖 Leer siempre este README antes de comenzar una nueva tarea
+
+**¡Gracias por mantener el orden! 💪**
+
+---
