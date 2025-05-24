@@ -25,6 +25,8 @@
     <header>
         {# Aquí podrías poner tu barra de navegación principal #}
         {# Ejemplo simple: #}
+        {% block extra_styles %}{% endblock %}
+
         <nav>
                     <a href="{% url 'home' %}">Inicio</a> |
                     <a href="{% url 'stock:manage_stock' %}">Stock</a> |
